@@ -46,13 +46,19 @@ print(f"Train : {X_train.shape[0]} obs, Test : {X_test.shape[0]} obs")
 
 # Random Forest model
 rf = RandomForestRegressor(
-    n_estimators=500,   
-    max_depth=None,     
+    n_estimators=500,
+    max_depth=6,            
+    min_samples_leaf=5,     
+    max_features="sqrt",    
     random_state=0,
-    n_jobs=-1,          
+    n_jobs=-1
 )
 
 rf.fit(X_train, y_train)
+
+y_train_pred = rf.predict(X_train)
+r2_train = r2_score(y_train, y_train_pred)
+print(f"Random Forest — R² train = {r2_train:.4f}")
 
 # prediction on test set
 y_pred = rf.predict(X_test)
