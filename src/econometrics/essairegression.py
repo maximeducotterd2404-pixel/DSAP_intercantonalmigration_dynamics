@@ -7,11 +7,12 @@ import pandas as pd
 from pyfixest.estimation import feols
 
 
-DATA_PATH = Path(
-    "/Users/maximeducotterd/Desktop/capstone project/analyses_finalproject/databasecsv.csv"
-)
-OUTPUT_DIR = Path("/Users/maximeducotterd/Desktop/")
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+ROOT = Path(__file__).resolve().parents[2]
+DATA_PATH = ROOT / "data" / "databasecsv.csv"
+OUTPUT_DIR = ROOT / "results"
+
+df = pd.read_csv(DATA_PATH, sep=";")
+print(f"Loaded {len(df)} rows")
 
 #Formula for the fixed effect regression
 FORMULA = (

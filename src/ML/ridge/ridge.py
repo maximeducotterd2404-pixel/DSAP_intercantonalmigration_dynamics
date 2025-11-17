@@ -14,7 +14,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, r2_score
 
 # Load and trying to prepare the data
-DATA_PATH = Path("/Users/maximeducotterd/Desktop/finalcapstone/data/databasecsv.csv")
+ROOT = Path(__file__).resolve().parents[2]
+DATA_PATH = ROOT / "data" / "databasecsv.csv"
 df = pd.read_csv(DATA_PATH, sep=";")
 df.columns = df.columns.str.strip()
 print(f"Loaded {len(df)} rows")
