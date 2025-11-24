@@ -7,12 +7,27 @@ import pandas as pd
 from pyfixest.estimation import feols
 
 
-ROOT = Path(__file__).resolve().parents[2]
+# Load and trying to prepare the data
+ROOT = Path(__file__).resolve().parents[3]
 DATA_PATH = ROOT / "data" / "databasecsv.csv"
-OUTPUT_DIR = ROOT / "results"
+#file loading with error handling
+try:
+    df = pd.read_csv(DATA_PATH, sep=";")
+    df.columns = df.columns.str.strip()
 
-df = pd.read_csv(DATA_PATH, sep=";")
-print(f"Loaded {len(df)} rows")
+except FileNotFoundError:
+    raise FileNotFoundError(
+        f"ERROR: dataset not found at {DATA_PATH}\n"
+    )
+except pd.errors.EmptyDataError:
+    raise RuntimeError(
+        f"ERROR: The file at {DATA_PATH} exists but is empty."
+    )
+except Exception as e:
+    raise RuntimeError(
+        f"Unexpected error when loading dataset at {DATA_PATH}: {e}"
+    )
+print("Columns :", df.columns.tolist())
 
 #Formula for the fixed effect regression
 FORMULA = (
@@ -75,14 +90,26 @@ def main():
         "CLUSTER1",
         "CLUSTER2"
     ]
+    # ===== CHECK REQUIRED COLUMNS BEFORE INTERACTIONS =====
+    required_before_interactions = [
+    "migration_rate", "canton", "year",
+    "log_rent_avg", "log_avg_income",
+    "log_unemployment", "log_schockexposure",
+    "CLUSTER0", "CLUSTER1", "CLUSTER2"
+    ]
+
+    missing = [c for c in required_before_interactions if c not in df.columns]
+    if missing:
+        raise KeyError(
+        f"Missing required columns before interactions: {missing}\n"
+        f"Columns available: {list(df.columns)}"
+    )
+
 
     # creation of interactions terms
     df["log_avg_income_x_log_rent_avg"] = df["log_avg_income"] * df["log_rent_avg"]
     df["log_unemployment_rate_x_log_avg_income"] = (
         df["log_unemployment"] * df["log_avg_income"]
-    )
-    df["log_schockexposure_x_CLUSTER0"] = (
-        df["log_schockexposure"] * df["CLUSTER0"]
     )
     df["log_schockexposure_x_CLUSTER1"] = (
         df["log_schockexposure"] * df["CLUSTER1"]
@@ -101,20 +128,32 @@ def main():
     # cleaning data: drops rows with missing value (should be 0, but we never know)
     required_cols = ["migration_rate", "canton", "year"] + base_vars + interaction_vars
     df_model = df.dropna(subset=required_cols).copy()
+    missing_after = [c for c in required_cols if c not in df.columns]
+    if missing_after:
+        raise KeyError(
+            f"Missing interaction columns: {missing_after}\n"
+            f"Columns available: {list(df.columns)}"
+        )
 
     print(f"After cleaning: {len(df_model)} observations\n")
 
     if df_model.empty:
-        print("❌ No valid data remaining!")
+        print("No valid data remaining!")
         return
 
     # FE estimation with clustered sdandard errors.
-    result = feols(FORMULA, data=df_model, vcov={"CRV1": CLUSTER_SPEC})
+    try:
+        result = feols(FORMULA, data=df_model, vcov={"CRV1": CLUSTER_SPEC})
+    except Exception as e:
+        raise RuntimeError(f"Fixed-effects regression failed: {e}")
 
 
     # construct of residuals and metrics to construct mse, rmse, r2 within
     y_true = df_model["migration_rate"].to_numpy()
-    y_pred = result.predict()
+    try:
+        y_pred = result.predict()
+    except Exception as e:
+        raise RuntimeError(f"Prediction failed: {e}")
     residuals = y_true - y_pred
 
     mse = float((residuals**2).mean())

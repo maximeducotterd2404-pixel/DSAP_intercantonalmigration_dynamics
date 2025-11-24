@@ -14,36 +14,56 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, r2_score
 
 # Load and trying to prepare the data
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[3]
 DATA_PATH = ROOT / "data" / "databasecsv.csv"
-df = pd.read_csv(DATA_PATH, sep=";")
-df.columns = df.columns.str.strip()
-print(f"Loaded {len(df)} rows")
+#file loading with error handling
+try:
+    df = pd.read_csv(DATA_PATH, sep=";")
+    df.columns = df.columns.str.strip()
+
+except FileNotFoundError:
+    raise FileNotFoundError(
+        f"ERROR: dataset not found at {DATA_PATH}\n"
+    )
+except pd.errors.EmptyDataError:
+    raise RuntimeError(
+        f"ERROR: The file at {DATA_PATH} exists but is empty."
+    )
+except Exception as e:
+    raise RuntimeError(
+        f"Unexpected error when loading dataset at {DATA_PATH}: {e}"
+    )
+print("Columns :", df.columns.tolist())
 
 # Base variables
-base_vars = [
-    "log_rent_avg",
-    "log_avg_income",
-    "log_unemployment",
-    "log_schockexposure",
+base_vars = [ 
+    "Z_score_rent",
+    "avg_income_zscore",
+    "z-score_unemployment",
+    "shockexposure_zscore",
     "CLUSTER1",
     "CLUSTER2",
 ]
 
 # Interactions
-df["log_avg_income_x_log_rent_avg"] = df["log_avg_income"] * df["log_rent_avg"]
-df["log_unemployment_rate_x_log_avg_income"] = df["log_unemployment"] * df["log_avg_income"]
-df["log_schockexposure_x_CLUSTER1"] = df["log_schockexposure"] * df["CLUSTER1"]
-df["log_schockexposure_x_CLUSTER2"] = df["log_schockexposure"] * df["CLUSTER2"]
+df["avg_income_zscore_x_Z_score_rent"] = df["avg_income_zscore"] * df["Z_score_rent"]
+df["z-score_unemployment_x_avg_income_zscore"] = df["z-score_unemployment"] * df["avg_income_zscore"]
+df["schockexposure_x_CLUSTER1"] = df["shockexposure_zscore"] * df["CLUSTER1"]
+df["schockexposure_x_CLUSTER2"] = df["shockexposure_zscore"] * df["CLUSTER2"]
 
 interaction_vars = [
-    "log_avg_income_x_log_rent_avg",
-    "log_unemployment_rate_x_log_avg_income",
-    "log_schockexposure_x_CLUSTER1",
-    "log_schockexposure_x_CLUSTER2",
+    "avg_income_zscore_x_Z_score_rent",
+    "z-score_unemployment_x_avg_income_zscore",
+    "schockexposure_x_CLUSTER1",
+    "schockexposure_x_CLUSTER2",
 ]
 
 required_cols = ["migration_rate", "canton", "year"] + base_vars + interaction_vars
+missing = [col for col in required_cols if col not in df.columns]
+
+if missing:
+    raise KeyError(f"Missing required columns: {missing}")
+
 df_model = df.dropna(subset=required_cols).copy()
 print(f"After initial cleaning: {len(df_model)} rows")
 
@@ -56,9 +76,18 @@ df_model["year"] = pd.to_numeric(df_model["year"], errors="coerce")
 # Final feature list
 feature_cols = base_vars + interaction_vars + [c for c in df_model.columns if c.startswith("canton_")]
 
-# Explicit numeric coercion
-X_df = df_model[feature_cols].apply(pd.to_numeric, errors="coerce")
-y_ser = pd.to_numeric(df_model["migration_rate"], errors="coerce")
+# safe numeric conversion
+try:
+    X_df = df_model[feature_cols].apply(pd.to_numeric, errors="coerce")
+    y_ser = pd.to_numeric(df_model["migration_rate"], errors="coerce")
+except Exception as e:
+    raise ValueError(f"Failed to convert features to numeric: {e}")
+
+# NaN check after coercion
+if X_df.isna().any().any() or y_ser.isna().any():
+    raise ValueError(
+        "Some features or target contain non-numeric or missing values "
+    )
 
 # Drop invalid rows
 mask_valid = (~X_df.isna().any(axis=1)) & (~y_ser.isna()) & (~df_model["year"].isna())

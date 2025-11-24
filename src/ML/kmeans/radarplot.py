@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from math import pi
 
-# Colonnes utilisées pour le radar + label lisible
+# used columna and their labels for radar plot
 FEATURE_MAP = [
     ("Z_score_rent",        "Rent"),
     ("avg_income_zscore",   "Income"),
@@ -13,29 +13,23 @@ FEATURE_MAP = [
 ]
 
 def _build_profiles(df):
-    """
-    Construit le tableau des moyennes par cluster
-    + la liste des cantons dans chaque cluster.
-    """
+    
+    # constructing of the profiles DataFrame
     df = df.copy()
-    if "cluster" not in df.columns:
-        raise ValueError("Le DataFrame doit contenir une colonne 'cluster'.")
-    if "canton" not in df.columns:
-        raise ValueError("Le DataFrame doit contenir une colonne 'canton'.")
 
-    # Vérifier que toutes les features sont présentes
+    # Verifying required feature colums
     missing = [col for col, _ in FEATURE_MAP if col not in df.columns]
     if missing:
-        raise ValueError(f"Colonnes manquantes dans df : {missing}")
+        raise ValueError(f"Missing columns in df : {missing}")
 
     df["canton"] = df["canton"].astype(str).str.strip()
 
     feature_cols = [col for col, _ in FEATURE_MAP]
 
-    # Moyenne des features par cluster
+    # average profiles per cluster
     profiles = df.groupby("cluster")[feature_cols].mean()
 
-    # Liste des cantons par cluster (pour les titres)
+    # list of cantons per cluster
     memberships = (
         df.groupby("cluster")["canton"]
         .apply(lambda x: ", ".join(sorted(set(x))))
@@ -46,19 +40,18 @@ def _build_profiles(df):
 
 
 def plot_cluster_radar(df, title="Cluster profiles (K-means)"):
-    """
-    Trace un radar plot pour chaque cluster.
-    df : DataFrame contenant au moins les colonnes canton, cluster et les features de FEATURE_MAP.
-    """
+    
+    "plot radart chart of cluster profiles"
+
     profiles = _build_profiles(df)
 
-    # Labels des axes
+    # axes labels
     categories = [label for _, label in FEATURE_MAP]
     n_vars = len(categories)
 
-    # Angles des axes (radial)
+    # axes angles
     angles = [n / float(n_vars) * 2 * pi for n in range(n_vars)]
-    angles += angles[:1]  # fermer le cercle
+    angles += angles[:1]  
 
     n_clusters = profiles.shape[0]
 
@@ -71,38 +64,38 @@ def plot_cluster_radar(df, title="Cluster profiles (K-means)"):
     if n_clusters == 1:
         axes = [axes]
 
-    # Palette de couleurs
+    # colors for each cluster
     colors = plt.cm.Set2(np.linspace(0, 1, n_clusters))
 
     feature_cols = [col for col, _ in FEATURE_MAP]
 
-    # Pour fixer une échelle cohérente, on regarde min/max des moyennes
+    # set y-axis limit
     ymin, ymax = -3, 3
 
 
     for idx, (cluster_id, row) in enumerate(profiles.iterrows()):
         ax = axes[idx]
 
-        # Valeurs dans l'ordre des features
+        # value for each feature
         values = row[feature_cols].tolist()
-        values += values[:1]  # fermer le polygone
+        values += values[:1]  
 
-        # Tracé
+        # plot data
         ax.plot(angles, values, "o-", linewidth=2, color=colors[idx])
         ax.fill(angles, values, alpha=0.25, color=colors[idx])
 
-        # Axes et ticks
+        # axes setting
         ax.set_xticks(angles[:-1])
         ax.set_xticklabels(categories, fontsize=9)
 
         ax.set_ylim(ymin, ymax)
         ax.grid(True, alpha=0.3)
 
-        # Ligne de référence horizontale (~moyenne globale)
+        # reference line = global mean
         global_mean = profiles[feature_cols].values.mean()
         ax.plot(angles, [global_mean] * len(angles), "k--", linewidth=0.5, alpha=0.5)
 
-        # Titre = cluster + cantons
+        # title with cluster id and members
         members = row["canton_list"]
         ax.set_title(f"Cluster {cluster_id}\n({members})", fontsize=10, fontweight="bold", pad=20)
 

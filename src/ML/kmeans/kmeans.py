@@ -3,11 +3,27 @@ import numpy as np
 from sklearn.cluster import KMeans
 from pathlib import Path
 
-# load data
-ROOT = Path(__file__).resolve().parents[2]
+# Load and trying to prepare the data
+ROOT = Path(__file__).resolve().parents[3]
 DATA_PATH = ROOT / "data" / "databasecsv.csv"
-df = pd.read_csv(DATA_PATH, sep=";")
-df.columns = df.columns.str.strip()
+#file loading with error handling
+try:
+    df = pd.read_csv(DATA_PATH, sep=";")
+    df.columns = df.columns.str.strip()
+
+except FileNotFoundError:
+    raise FileNotFoundError(
+        f"ERROR: dataset not found at {DATA_PATH}\n"
+    )
+except pd.errors.EmptyDataError:
+    raise RuntimeError(
+        f"ERROR: The file at {DATA_PATH} exists but is empty."
+    )
+except Exception as e:
+    raise RuntimeError(
+        f"Unexpected error when loading dataset at {DATA_PATH}: {e}"
+    )
+print("Columns :", df.columns.tolist())
 
 # vars for kmeans
 feature_cols = [

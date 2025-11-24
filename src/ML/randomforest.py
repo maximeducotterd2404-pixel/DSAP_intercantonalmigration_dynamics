@@ -9,10 +9,26 @@ from sklearn.metrics import r2_score, root_mean_squared_error
 # load and cleand data
 ROOT = Path(__file__).resolve().parents[2]
 DATA_PATH = ROOT / "data" / "databasecsv.csv"
-df = pd.read_csv(DATA_PATH, sep=";")
-df.columns = df.columns.str.strip() 
+try:
+    df = pd.read_csv(DATA_PATH, sep=";")
+    df.columns = df.columns.str.strip()
 
-print("Colonnes dispo :", df.columns.tolist())
+except FileNotFoundError:
+    raise FileNotFoundError(
+        f"ERROR: dataset not found at {DATA_PATH}\n"
+        "Check that databasecsv.csv is inside the /data/ folder."
+    )
+
+except pd.errors.EmptyDataError:
+    raise RuntimeError(
+        f"ERROR: The file at {DATA_PATH} exists but is empty."
+    )
+
+except Exception as e:
+    raise RuntimeError(
+        f"Unexpected error when loading dataset at {DATA_PATH}: {e}"
+    )
+print("Columns :", df.columns.tolist())
 
 # features choice
 feature_cols = [
@@ -27,11 +43,31 @@ feature_cols = [
 
 target_col = "migration_rate"  
 
+# verification of required columns
 cols_needed = feature_cols + [target_col]
-df = df.dropna(subset=cols_needed).copy()
+missing = [c for c in cols_needed if c not in df.columns]
 
+if missing:
+    raise KeyError(
+        f"Missing required columns: {missing}\n"
+        f"Columns available in dataset: {list(df.columns)}"
+    )
+
+df = df.dropna(subset=cols_needed).copy()
 X = df[feature_cols].values
 y = df[target_col].values
+
+# safe conversion to numeric
+try:
+    X = df[feature_cols].apply(pd.to_numeric, errors="coerce").values
+    y = pd.to_numeric(df[target_col], errors="coerce").values
+except Exception as e:
+    raise ValueError(f"Failed to convert data to numeric: {e}")
+
+if np.isnan(X).any() or np.isnan(y).any():
+    raise ValueError(
+        "NaN values detected in features or target after numeric conversion.\n"
+    )
 
 # split data into train and tests sets
 X_train, X_test, y_train, y_test = train_test_split(
@@ -54,7 +90,11 @@ rf = RandomForestRegressor(
     n_jobs=-1
 )
 
-rf.fit(X_train, y_train)
+# trainig with error handlong
+try:
+    rf.fit(X_train, y_train)
+except Exception as e:
+    raise RuntimeError(f"Random Forest training failed: {e}")
 
 y_train_pred = rf.predict(X_train)
 r2_train = r2_score(y_train, y_train_pred)

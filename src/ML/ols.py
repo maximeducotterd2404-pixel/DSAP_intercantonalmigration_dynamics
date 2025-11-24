@@ -12,14 +12,31 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
 
-#charge and clean data
+# load and clean data
 ROOT = Path(__file__).resolve().parents[2]
 DATA_PATH = ROOT / "data" / "databasecsv.csv"
-df = pd.read_csv(DATA_PATH, sep=";")
-df.columns = df.columns.str.strip()
-print(f"Loaded {len(df)} rows")
+try:
+    df = pd.read_csv(DATA_PATH, sep=";")
+    df.columns = df.columns.str.strip()
 
-# Variables de base (comme dans essairegression.py)
+except FileNotFoundError:
+    raise FileNotFoundError(
+        f"ERROR: dataset not found at {DATA_PATH}\n"
+        "Check that databasecsv.csv is inside the /data/ folder."
+    )
+
+except pd.errors.EmptyDataError:
+    raise RuntimeError(
+        f"ERROR: The file at {DATA_PATH} exists but is empty."
+    )
+
+except Exception as e:
+    raise RuntimeError(
+        f"Unexpected error when loading dataset at {DATA_PATH}: {e}"
+    )
+print("Columns :", df.columns.tolist())
+
+# Variables choice
 base_vars = [
     "log_rent_avg",
     "log_avg_income",
@@ -28,6 +45,20 @@ base_vars = [
     "CLUSTER1",
     "CLUSTER2",
 ]
+# check required columns before interactions
+required_before_interactions = [
+    "migration_rate", "canton", "year",
+    "log_rent_avg", "log_avg_income",
+    "log_unemployment", "log_schockexposure",
+    "CLUSTER1", "CLUSTER2"
+]
+
+missing = [c for c in required_before_interactions if c not in df.columns]
+if missing:
+    raise KeyError(
+        f"Missing required columns before interactions: {missing}\n"
+        f"Columns available: {list(df.columns)}"
+    )
 
 # Interactions terms
 df["log_avg_income_x_log_rent_avg"] = df["log_avg_income"] * df["log_rent_avg"]
@@ -43,6 +74,15 @@ interaction_vars = [
 ]
 
 required_cols = ["migration_rate", "canton", "year"] + base_vars + interaction_vars
+
+# check required columns after interactions
+missing_after = [c for c in required_cols if c not in df.columns]
+if missing_after:
+    raise KeyError(
+        f"Missing required columns after interactions: {missing_after}\n"
+        f"Columns available: {list(df.columns)}"
+    )
+
 df_model = df.dropna(subset=required_cols).copy()
 print(f"After initial cleaning: {len(df_model)} rows")
 
@@ -55,9 +95,19 @@ df_model["year"] = pd.to_numeric(df_model["year"], errors="coerce")
 # Finales feature
 feature_cols = base_vars + interaction_vars + [c for c in df_model.columns if c.startswith("canton_")]
 
-# Conversion in numeric
-X_df = df_model[feature_cols].apply(pd.to_numeric, errors="coerce")
-y_ser = pd.to_numeric(df_model["migration_rate"], errors="coerce")
+# numeric conversion with error handling
+try:
+    X_df = df_model[feature_cols].apply(pd.to_numeric, errors="coerce")
+    y_ser = pd.to_numeric(df_model["migration_rate"], errors="coerce")
+except Exception as e:
+    raise ValueError(f"Failed to convert features to numeric: {e}")
+
+# detect NaNs after conversion
+if X_df.isna().any().any() or y_ser.isna().any():
+    raise ValueError(
+        "NaN values detected after numeric conversion. "
+        "Check dataset or preprocessing."
+    )
 
 # Drop invalids lines
 mask_valid = (~X_df.isna().any(axis=1)) & (~y_ser.isna()) & (~df_model["year"].isna())
@@ -89,11 +139,17 @@ print("Split shapes ->",
 # model creation
 model = LinearRegression()
 
-# training the model
-model.fit(X_train, y_train)
+# training the model with error handling
+try:
+    model.fit(X_train, y_train)
+except Exception as e:
+    raise RuntimeError(f"LinearRegression training failed: {e}")
 
 # prediction
-y_pred = model.predict(X_test)
+try:
+    y_pred = model.predict(X_test)
+except Exception as e:
+    raise RuntimeError(f"Prediction failed: {e}")
 
 # evaluation
 mse = mean_squared_error(y_test, y_pred)
