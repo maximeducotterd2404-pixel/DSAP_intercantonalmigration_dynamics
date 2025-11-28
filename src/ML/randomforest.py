@@ -69,14 +69,24 @@ if np.isnan(X).any() or np.isnan(y).any():
         "NaN values detected in features or target after numeric conversion.\n"
     )
 
-# split data into train and tests sets
-X_train, X_test, y_train, y_test = train_test_split(
-    X,
-    y,
-    test_size=0.2,
-    random_state=0,
-    shuffle=True,
-)
+# temporal train-test split
+
+df = df.sort_values("year").reset_index(drop=True)
+
+years = df["year"].unique()
+cut = int(0.8 * len(years))    # 80% train / 20% test
+
+train_years = set(years[:cut])
+test_years  = set(years[cut:])
+
+X_train = df.loc[df["year"].isin(train_years), feature_cols].to_numpy()
+y_train = df.loc[df["year"].isin(train_years), target_col].to_numpy()
+
+X_test  = df.loc[df["year"].isin(test_years),  feature_cols].to_numpy()
+y_test  = df.loc[df["year"].isin(test_years),  target_col].to_numpy()
+
+print(f"Train : {X_train.shape[0]} obs, Test : {X_test.shape[0]} obs")
+
 
 print(f"Train : {X_train.shape[0]} obs, Test : {X_test.shape[0]} obs")
 
@@ -90,7 +100,7 @@ rf = RandomForestRegressor(
     n_jobs=-1
 )
 
-# trainig with error handlong
+# trainig with error handling
 try:
     rf.fit(X_train, y_train)
 except Exception as e:
