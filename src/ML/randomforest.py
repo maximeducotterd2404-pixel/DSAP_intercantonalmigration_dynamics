@@ -35,6 +35,10 @@ def load_data (path=None):
 # features choice
 def prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     
+    # Encode canton as categorical codes
+    df["canton_id"] = df["canton"].astype("category").cat.codes
+    df["migration_lag1"] = df.groupby("canton_id")["migration_rate"].shift(1)
+
     feature_cols = [
     "log_rent_avg",
     "log_avg_income",
@@ -43,6 +47,7 @@ def prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     "CLUSTER0",
     "CLUSTER1",
     "CLUSTER2",
+    "migration_lag1",
     ]
 
     target_col = "migration_rate"  

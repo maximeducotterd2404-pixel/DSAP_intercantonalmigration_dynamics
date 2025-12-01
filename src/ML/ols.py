@@ -32,6 +32,11 @@ def load_data(path=None):
 
 # Variables choice
 def prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+
+    # Encode canton as categorical codes
+    df["canton_id"] = df["canton"].astype("category").cat.codes
+    df["migration_lag1"] = df.groupby("canton_id")["migration_rate"].shift(1)   
+
     base_vars = [
         "log_rent_avg",
         "log_avg_income",
@@ -39,6 +44,7 @@ def prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         "log_schockexposure",
         "CLUSTER1",
         "CLUSTER2",
+        "migration_lag1",
     ]
     # check required columns before interactions
     required_before_interactions = [
