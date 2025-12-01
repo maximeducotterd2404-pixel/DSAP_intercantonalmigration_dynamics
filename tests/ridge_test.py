@@ -1,0 +1,109 @@
+import pytest
+import pandas as pd
+import numpy as np
+
+from pathlib import Path
+
+from src.ML.ridge.ridge import (
+    load_data,
+    prepare_dataframe,
+    time_split,
+    run_ridge,
+)
+
+#1. Test load_data
+
+def test_load_data_success(tmp_path):
+    """load_data doit charger un CSV valide."""
+    file = tmp_path / "fake.csv"
+    df_test = pd.DataFrame({"A": [1, 2]})
+    df_test.to_csv(file, sep=";", index=False)
+
+    df_loaded = load_data(path=file)
+    assert isinstance(df_loaded, pd.DataFrame)
+    assert df_loaded.shape == (2, 1)
+
+
+def test_load_data_missing_file():
+    """load_data doit lever FileNotFoundError si fichier inexistant."""
+    with pytest.raises(FileNotFoundError):
+        load_data("FILE_DOES_NOT_EXIST.csv")
+
+
+
+# 2. test prepare_dataframe
+
+
+def test_prepare_dataframe_valid():
+    """prepare_dataframe doit retourner un df propre avec toutes les features."""
+    
+    df = pd.DataFrame({
+        "migration_rate": [0.1, 0.2],
+        "canton": ["VD", "GE"],
+        "year": [2015, 2016],
+        "Z_score_rent": [1, 2],
+        "avg_income_zscore": [0.5, 0.7],
+        "z-score_unemployment": [0.1, -0.2],
+        "shockexposure_zscore": [0.3, 0.4],
+        "CLUSTER1": [0, 1],
+        "CLUSTER2": [1, 0],
+    })
+
+    df_prepared = prepare_dataframe(df)
+
+    # verifications
+    assert isinstance(df_prepared, pd.DataFrame)
+    assert "canton_GE" in df_prepared.columns or "canton_VD" in df_prepared.columns
+    assert df_prepared.shape[0] == 2  
+
+def test_prepare_dataframe_missing_cols():
+    """prepare_dataframe doit lever KeyError si colonnes manquantes."""
+    df = pd.DataFrame({"irrelevant": [1, 2]})
+    with pytest.raises(KeyError):
+        prepare_dataframe(df)
+
+
+
+# 3. TEST time_split
+
+
+def test_time_split_basic():
+    """time_split doit renvoyer 4 matrices numpy bien séparées."""
+    
+    df = pd.DataFrame({
+        "migration_rate": [1,2,3,4],
+        "year": [2010, 2011, 2012, 2013],
+        "f1": [10,11,12,13],
+        "f2": [20,21,22,23],
+    })
+
+    X_train, X_test, y_train, y_test = time_split(df, feature_cols=["f1", "f2"])
+
+    # Vérifications
+    assert isinstance(X_train, np.ndarray)
+    assert isinstance(X_test, np.ndarray)
+    assert len(X_train) > 0
+    assert len(y_test) > 0
+
+
+# 4. TEST run_ridge
+
+
+def test_run_ridge_basic():
+    """run_ridge doit fitter un modèle Ridge et renvoyer résultats cohérents."""
+    
+    X_train = np.array([[0],[1],[2]])
+    y_train = np.array([0,1,2])
+    X_test  = np.array([[1],[2]])
+    y_test  = np.array([1,2])
+
+    model, best_alpha, best_r2, results = run_ridge(
+        X_train, y_train, X_test, y_test,
+        alphas=[0, 0.1, 1.0]
+    )
+
+    assert hasattr(model, "coef_")
+    assert isinstance(best_alpha, (float, int))
+    assert isinstance(results, list)
+    assert len(results) == 3
+    assert best_r2 <= 1 and best_r2 >= -10

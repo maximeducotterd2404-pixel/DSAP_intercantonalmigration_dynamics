@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from math import pi
+import textwrap
 
 # used columna and their labels for radar plot
 FEATURE_MAP = [
@@ -97,7 +98,12 @@ def plot_cluster_radar(df, title="Cluster profiles (K-means)"):
 
         # title with cluster id and members
         members = row["canton_list"]
-        ax.set_title(f"Cluster {cluster_id}\n({members})", fontsize=10, fontweight="bold", pad=20)
+
+        # wrap en lignes de max 25–30 caractères
+        wrapped = "\n".join(textwrap.wrap(members, width=25))
+
+        ax.set_title(f"Cluster {cluster_id}\n{wrapped}", fontsize=10, fontweight="bold", pad=20)
+
 
     plt.suptitle(title, fontsize=14, fontweight="bold")
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])

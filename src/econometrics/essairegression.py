@@ -8,33 +8,28 @@ from pyfixest.estimation import feols
 
 
 # Load and trying to prepare the data
-ROOT = Path(__file__).resolve().parents[3]
-DATA_PATH = ROOT / "data" / "databasecsv.csv"
-#file loading with error handling
-try:
-    df = pd.read_csv(DATA_PATH, sep=";")
-    df.columns = df.columns.str.strip()
+def load_data(path=None):
+    if path is None:
+        ROOT = Path(__file__).resolve().parents[2]
+        path = ROOT / "data" / "databasecsv.csv"
 
-except FileNotFoundError:
-    raise FileNotFoundError(
-        f"ERROR: dataset not found at {DATA_PATH}\n"
-    )
-except pd.errors.EmptyDataError:
-    raise RuntimeError(
-        f"ERROR: The file at {DATA_PATH} exists but is empty."
-    )
-except Exception as e:
-    raise RuntimeError(
-        f"Unexpected error when loading dataset at {DATA_PATH}: {e}"
-    )
-print("Columns :", df.columns.tolist())
-
+    try:
+        df = pd.read_csv(path, sep=";")
+        df.columns = df.columns.str.strip()
+        return df
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Dataset not found at {path}")
+    except pd.errors.EmptyDataError:
+        raise RuntimeError(f"Dataset exists but is empty at {path}")
+    except Exception as e:
+        raise RuntimeError(f"Unexpected error loading dataset: {e}")
+    
 #Formula for the fixed effect regression
 FORMULA = (
     "migration_rate ~ log_rent_avg + log_avg_income + log_unemployment + "
-    "log_schockexposure + "
+    "shock_exposure + "
     "log_avg_income_x_log_rent_avg + log_unemployment_rate_x_log_avg_income + "
-    "log_schockexposure_x_CLUSTER1 + log_schockexposure_x_CLUSTER2 | "
+    "shockexposure_x_CLUSTER1 + shockexposure_x_CLUSTER2 | "
     "canton"
 )
 # Error standard clusering.
@@ -76,6 +71,9 @@ def format_summary(title, tidy_df, r2, mse, rmse, n_obs, cluster_spec):
 def main():
     """charge data, construct the model."""
 
+    ROOT = Path(__file__).resolve().parents[2]
+    DATA_PATH = ROOT / "data" / "databasecsv.csv"
+
     df = pd.read_csv(DATA_PATH, sep=";")
     df.columns = df.columns.str.strip()
 
@@ -86,7 +84,7 @@ def main():
         "log_rent_avg",
         "log_avg_income",
         "log_unemployment",
-        "log_schockexposure",
+        "shock_exposure",
         "CLUSTER1",
         "CLUSTER2"
     ]
@@ -94,7 +92,7 @@ def main():
     required_before_interactions = [
     "migration_rate", "canton", "year",
     "log_rent_avg", "log_avg_income",
-    "log_unemployment", "log_schockexposure",
+    "log_unemployment", "shock_exposure",
     "CLUSTER0", "CLUSTER1", "CLUSTER2"
     ]
 
@@ -111,18 +109,18 @@ def main():
     df["log_unemployment_rate_x_log_avg_income"] = (
         df["log_unemployment"] * df["log_avg_income"]
     )
-    df["log_schockexposure_x_CLUSTER1"] = (
-        df["log_schockexposure"] * df["CLUSTER1"]
+    df["shockexposure_x_CLUSTER1"] = (
+        df["shock_exposure"] * df["CLUSTER1"]
     )
-    df["log_schockexposure_x_CLUSTER2"] = (
-        df["log_schockexposure"] * df["CLUSTER2"]
+    df["shockexposure_x_CLUSTER2"] = (
+        df["shock_exposure"] * df["CLUSTER2"]
     )
 
     interaction_vars = [
         "log_avg_income_x_log_rent_avg",
         "log_unemployment_rate_x_log_avg_income",
-        "log_schockexposure_x_CLUSTER1",
-        "log_schockexposure_x_CLUSTER2",
+        "shockexposure_x_CLUSTER1",
+        "shockexposure_x_CLUSTER2",
     ]
 
     # cleaning data: drops rows with missing value (should be 0, but we never know)
@@ -172,9 +170,9 @@ def main():
     # marginal effects calculation
     coefs = result.coef() #get the coefficent from the regression
 
-    b0 = coefs.get("log_schockexposure", np.nan)
-    b1 = coefs.get("log_schockexposure_x_CLUSTER1", 0)
-    b2 = coefs.get("log_schockexposure_x_CLUSTER2", 0)
+    b0 = coefs.get("shock_exposure", np.nan)
+    b1 = coefs.get("shockexposure_x_CLUSTER1", 0)
+    b2 = coefs.get("shockexposure_x_CLUSTER2", 0)
 
 
     # calulate the marginal effects for each cluster
@@ -203,14 +201,8 @@ def main():
         CLUSTER_SPEC,
     )
 
-    output_file = OUTPUT_DIR / "lin_log.txt"
-    output_file.write_text(summary + "\n", encoding="utf-8")
-
     print( "Regression finished\n")
     print(summary)
-    print(f"\nSaved to: {output_file}")
-
-
 
 if __name__ == "__main__":
     main()
