@@ -14,6 +14,10 @@ from pathlib import Path
 import argparse
 import sys
 
+from src import data_loader as dl
+from src import models as mdl
+from src import evaluation as evl
+# We still import the underlying modules for time-based split helpers and feature utilities
 from src.ML.ols import ols as ols_module
 from src.ML.ridge import ridge as ridge_module
 from src.ML.randomforest import randomforest as rf_module
@@ -25,19 +29,18 @@ DATA_DEFAULT = Path(__file__).resolve().parent / "data" / "databasecsv.csv"
 
 
 def run_ols(data_path: Path) -> None:
-    df = ols_module.load_data(data_path)
-    df_model, X_df, y_ser, feature_cols = ols_module.prepare_dataframe(df)
+    # Use the data_loader facade (wraps existing loader/prep)
+    df_model, X_df, y_ser, feature_cols = dl.load_for_ols(data_path)
     X_train, X_test, y_train, y_test = ols_module.time_split(df_model, feature_cols)
-    _, _, mse, r2, _, _ = ols_module.run_ols(X_train, y_train, X_test, y_test)
+    _, y_pred, mse, r2, _, _ = mdl.train_ols(X_train, y_train, X_test, y_test)
 
     print("=== OLS ===")
-    print(f"MSE: {mse:.4f} | R2: {r2:.4f}")
+    print(f"MSE: {mse:.4f} | RMSE: {mse**0.5:.4f} | R2: {r2:.4f}")
     print(f"Train rows: {len(y_train)} | Test rows: {len(y_test)}")
 
 
 def run_ridge(data_path: Path) -> None:
-    df = ridge_module.load_data(data_path)
-    df_model = ridge_module.prepare_dataframe(df)
+    df_model = dl.load_for_ridge(data_path)
 
     base_vars = [
         "Z_score_rent",
@@ -57,7 +60,7 @@ def run_ridge(data_path: Path) -> None:
     feature_cols = base_vars + interaction_vars + [c for c in df_model.columns if c.startswith("canton_")]
 
     X_train, X_test, y_train, y_test = ridge_module.time_split(df_model, feature_cols)
-    best_model, best_alpha, best_r2_test, _, scaler = ridge_module.run_ridge(
+    best_model, best_alpha, best_r2_test, _, scaler = mdl.train_ridge(
         X_train, y_train, X_test, y_test, alphas=[0, 0.0001, 0.001, 0.01, 0.1, 1.0, 10.0]
     )
 
@@ -78,45 +81,43 @@ def run_ridge(data_path: Path) -> None:
 
 
 def run_randomforest(data_path: Path) -> None:
-    df = rf_module.load_data(data_path)
-    df, feature_cols, target_col = rf_module.prepare_dataframe(df)
+    df, feature_cols, target_col = dl.load_for_randomforest(data_path)
     X_train, X_test, y_train, y_test = rf_module.time_split(df, feature_cols, target_col)
-    rf, _, r2_test, rmse, r2_train = rf_module.run_random_forest(X_train, y_train, X_test, y_test)
+    rf, _, r2_test, rmse, r2_train = mdl.train_randomforest(X_train, y_train, X_test, y_test)
     feat_imp = rf_module.get_feature_importance(rf, feature_cols)[:5]
+    metrics = evl.eval_randomforest(rf, X_train, y_train, X_test, y_test)
 
     print("=== Random Forest ===")
-    print(f"Train R2: {r2_train:.4f} | Test R2: {r2_test:.4f} | Test RMSE: {rmse:.4f}")
+    print(f"Train R2: {metrics['r2_train']:.4f} | Test R2: {metrics['r2_test']:.4f} | Test RMSE: {metrics['rmse_test']:.4f}")
     print("Top feature importances (name, importance):")
     for name, score in feat_imp:
         print(f"  {name:25s} {score:.4f}")
 
 
 def run_gradientboosting(data_path: Path) -> None:
-    df = gb_module.load_data(data_path)
-    df = gb_module.engineer_features(df)
-    df, feature_cols, target_col = gb_module.prepare_dataframe(df)
+    df, feature_cols, target_col = dl.load_for_gradientboosting(data_path)
     X_train, X_test, y_train, y_test = gb_module.time_split(df, feature_cols, target_col)
-    model = gb_module.train_boosting(X_train, y_train)
-    train_r2, test_r2, rmse = gb_module.evaluate(model, X_train, y_train, X_test, y_test)
+    model = mdl.train_gradientboosting(X_train, y_train)
+    metrics = evl.eval_gradientboosting(model, X_train, y_train, X_test, y_test)
 
     importance = dict(zip(feature_cols, model.feature_importances_))
     sorted_imp = sorted(importance.items(), key=lambda x: -x[1])[:5]
 
     print("=== Gradient Boosting ===")
-    print(f"Train R2: {train_r2:.4f} | Test R2: {test_r2:.4f} | Test RMSE: {rmse:.4f}")
+    print(f"Train R2: {metrics['r2_train']:.4f} | Test R2: {metrics['r2_test']:.4f} | Test RMSE: {metrics['rmse_test']:.4f}")
     print("Top feature importances (name, importance):")
     for name, score in sorted_imp:
         print(f"  {name:25s} {score:.4f}")
 
 
 def run_decisiontree(data_path: Path) -> None:
-    df = dt_module.load_data(data_path)
+    df = dl.load_for_decisiontree(data_path)
     X_train, y_train, X_test, y_test = dt_module.prepare_dataset(df)
-    model = dt_module.train_decision_tree(X_train, y_train)
-    acc = dt_module.evaluate_model(model, X_test, y_test)
+    model = mdl.train_decisiontree(X_train, y_train)
+    metrics = evl.eval_decisiontree(model, X_test, y_test)
 
     print("=== Decision Tree (classification on migration direction) ===")
-    print(f"Accuracy: {acc:.4f}")
+    print(f"Accuracy: {metrics['accuracy']:.4f}")
     print(f"Train rows: {len(y_train)} | Test rows: {len(y_test)}")
 
 

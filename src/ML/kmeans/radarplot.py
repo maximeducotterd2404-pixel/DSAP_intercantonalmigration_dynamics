@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from math import pi
 import textwrap
+import sys
+from pathlib import Path
 
 # used columna and their labels for radar plot
 FEATURE_MAP = [
@@ -108,3 +110,20 @@ def plot_cluster_radar(df, title="Cluster profiles (K-means)"):
     plt.suptitle(title, fontsize=14, fontweight="bold")
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
     plt.show()
+
+
+if __name__ == "__main__":
+    # Ensure project root is on sys.path when running directly
+    ROOT = Path(__file__).resolve().parents[3]
+    if str(ROOT) not in sys.path:
+        sys.path.insert(0, str(ROOT))
+
+    # Quick CLI entry to produce the radar plot directly.
+    from src.ML.kmeans.kmeans import load_data, prepare_matrix, run_kmeans, assign_clusters
+
+    df = load_data()
+    df_clean, X = prepare_matrix(df)
+    model = run_kmeans(X, k=3, random_state=0)
+    df_clustered = assign_clusters(df_clean, model)
+
+    plot_cluster_radar(df_clustered)
