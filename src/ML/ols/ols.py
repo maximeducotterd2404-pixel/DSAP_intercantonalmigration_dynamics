@@ -15,7 +15,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 # data loading function
 def load_data(path=None):
     if path is None:
-        ROOT = Path(__file__).resolve().parents[2]
+        ROOT = Path(__file__).resolve().parents[3]
         path = ROOT / "data" / "databasecsv.csv"
 
     try:

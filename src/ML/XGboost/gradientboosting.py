@@ -12,7 +12,7 @@ from sklearn.metrics import r2_score, mean_squared_error
 # 1. Load data
 def load_data(path=None):
     if path is None:
-        ROOT = Path(__file__).resolve().parents[2]
+        ROOT = Path(__file__).resolve().parents[3]
         path = ROOT / "data" / "databasecsv.csv"
 
     try:
@@ -105,14 +105,14 @@ def time_split(df, feature_cols, target_col):
 def train_boosting(X_train, y_train):
     
     model = GradientBoostingRegressor(
-        loss="squared_error",
-        n_estimators=1200,
-        learning_rate=0.01,
-        max_depth=3,
-        min_samples_split=5,
-        min_samples_leaf=3,
-        subsample=0.8,
-        random_state=0,
+    loss="squared_error",
+    n_estimators=80,   
+    learning_rate=0.05,      
+    max_depth=2,             
+    min_samples_split=10,    
+    min_samples_leaf=5,      
+    subsample=0.8,
+    random_state=0,
     )
 
     model.fit(X_train, y_train)

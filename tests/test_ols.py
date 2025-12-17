@@ -4,7 +4,7 @@ import numpy as np
 from pathlib import Path
 
 # Import your module
-from src.ML.ols import (
+from src.ML.ols.ols import (
     load_data,
     prepare_dataframe,
     time_split,

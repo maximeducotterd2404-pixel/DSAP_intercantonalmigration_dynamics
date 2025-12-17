@@ -120,23 +120,29 @@ def run_ridge(X_train, y_train, X_test, y_test, alphas):
     X_test_scaled  = scaler.transform(X_test)
 
     best_alpha = None
-    best_r2 = -1e9
-    results = []
+    best_r2_test = -np.inf 
+    best_model = None
 
+    results = []
+    
     for alpha in alphas:
         model = Ridge(alpha=alpha)  # alpha = lambda
         model.fit(X_train_scaled, y_train)
-        y_pred = model.predict(X_test_scaled)
+        y_pred_train = model.predict(X_train_scaled)
+        y_pred_test  = model.predict(X_test_scaled)
 
-        mse = mean_squared_error(y_test, y_pred)
-        r2 = r2_score(y_test, y_pred)
+        r2_train = r2_score(y_train, y_pred_train)
+        r2_test  = r2_score(y_test, y_pred_test)
+        mse_test = mean_squared_error(y_test, y_pred_test)
+        
+        results.append((alpha, mse_test, r2_train, r2_test))
 
-        results.append((alpha, mse, r2))
-
-        if r2 > best_r2:
-            best_r2 = r2
+        if r2_test > best_r2_test:
+            best_r2_test = r2_test
             best_alpha = alpha
-    return model, best_alpha, best_r2, results
+            best_model = model
+
+    return best_model, best_alpha, best_r2_test, results, scaler
 
 if __name__ == "__main__":
     ROOT = Path(__file__).resolve().parents[3]
@@ -167,16 +173,25 @@ if __name__ == "__main__":
 
     X_train, X_test, y_train, y_test = time_split(df, feature_cols)
 
-    best_model, best_alpha, best_r2, results = run_ridge(
-        X_train, y_train, X_test, y_test,
-        alphas=[0, 0.0001, 0.001, 0.01, 0.1, 1.0, 10.0]
-    )
+    best_model, best_alpha, best_r2_test, results, scaler = run_ridge(
+    X_train, y_train, X_test, y_test,
+    alphas=[0, 0.0001, 0.001, 0.01, 0.1, 1.0, 10.0]
+)
 
-    print("\n=== RIDGE RESULTS ===")
-    for a, mse, r2 in results:
-        print(f"λ={a:6.4f}  MSE={mse:.4f}  R²={r2:.4f}")
+    # --- Recompute train/test predictions for the best model ---
+    X_train_scaled = scaler.transform(X_train)
+    X_test_scaled  = scaler.transform(X_test)
 
-    print(f"\nBest λ: {best_alpha} | R² = {best_r2:.4f}")
+    y_pred_train = best_model.predict(X_train_scaled)
+    y_pred_test  = best_model.predict(X_test_scaled)
+
+    r2_train_best = r2_score(y_train, y_pred_train)
+    r2_test_best  = r2_score(y_test, y_pred_test)
+
+    print(f"\n=== BEST MODEL PERFORMANCE ===")
+    print(f"Best λ: {best_alpha}")
+    print(f"Train R²: {r2_train_best:.4f}")
+    print(f"Test  R²: {r2_test_best:.4f}")
     # ---- Display Ridge coefficients ----
     print("\n=== RIDGE COEFFICIENTS (best model) ===")
 
