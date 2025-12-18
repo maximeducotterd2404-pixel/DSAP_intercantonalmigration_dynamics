@@ -4,6 +4,7 @@ from math import pi
 import textwrap
 import sys
 from pathlib import Path
+from datetime import datetime
 
 # used columna and their labels for radar plot
 FEATURE_MAP = [
@@ -109,7 +110,12 @@ def plot_cluster_radar(df, title="Cluster profiles (K-means)"):
 
     plt.suptitle(title, fontsize=14, fontweight="bold")
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+    results_dir = Path(__file__).resolve().parents[3] / "results"
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    outfile = results_dir / f"kmeans_radar_{timestamp}.png"
+    plt.savefig(outfile, dpi=300, bbox_inches="tight")
     plt.show()
+    return outfile
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 # ridge_plots.py
 import pandas as pd
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 def plot_true_vs_pred(y_true, y_pred, title="Ridge – True vs Predicted"):
     """Scatter plot True vs Predicted with a 45° line."""
@@ -17,4 +18,8 @@ def plot_true_vs_pred(y_true, y_pred, title="Ridge – True vs Predicted"):
     plt.title(title)
     plt.grid(True)
     plt.legend()
+    results_dir = Path(__file__).resolve().parents[3] / "results"
+    outfile = results_dir / "ridge_true_vs_pred.png"
+    plt.savefig(outfile, dpi=300, bbox_inches="tight")
     plt.show()
+    return outfile

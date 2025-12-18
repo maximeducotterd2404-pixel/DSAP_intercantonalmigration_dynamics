@@ -1,6 +1,7 @@
 # boost_plots.py
 import matplotlib.pyplot as plt
 import numpy as np
+from pathlib import Path
 
 def plot_true_vs_pred_boost(y_true, y_pred, title="Boosting – True vs Predicted"):
 
@@ -20,4 +21,8 @@ def plot_true_vs_pred_boost(y_true, y_pred, title="Boosting – True vs Predicte
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
+    results_dir = Path(__file__).resolve().parents[3] / "results"
+    outfile = results_dir / "gradientboosting_true_vs_pred.png"
+    plt.savefig(outfile, dpi=300, bbox_inches="tight")
     plt.show()
+    return outfile

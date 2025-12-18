@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from sklearn.cluster import KMeans
 from pathlib import Path
+from .radarplot import plot_cluster_radar
 
 # configuration of features ton use
 FEATURE_COLS = [
@@ -57,8 +58,6 @@ def assign_clusters(df_clean, model):
     df_out = df_clean.copy()
     df_out["cluster"] = model.labels_
     return df_out
-
-from radarplot import plot_cluster_radar
 
 def main():
     df = load_data()

@@ -2,6 +2,7 @@
 
 import matplotlib.pyplot as plt
 import numpy as np
+from pathlib import Path
 
 
 def plot_true_vs_pred_rf(y_true, y_pred, title="Random Forest – True vs Predicted"):
@@ -32,4 +33,8 @@ def plot_true_vs_pred_rf(y_true, y_pred, title="Random Forest – True vs Predic
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
+    results_dir = Path(__file__).resolve().parents[3] / "results"
+    outfile = results_dir / "ols_true_vs_pred.png"
+    plt.savefig(outfile, dpi=300, bbox_inches="tight")
     plt.show()
+    return outfile
