@@ -5,7 +5,7 @@ import numpy as np
 from pathlib import Path
 
 # Import your module
-from src.ML.kmeans.randomforest.randomforest import (
+from src.ML.randomforest.randomforest import (
     load_data,
     prepare_dataframe,
     time_split,
@@ -37,6 +37,8 @@ def test_load_data_missing():
 def test_prepare_dataframe_valid():
     """prepare_dataframe should return cleaned df + feature list + target name."""
     df = pd.DataFrame({
+        "canton": ["VD", "VD", "VD"],
+        "year": [2010, 2011, 2012],
         "log_rent_avg": [1, 2, 3],
         "log_avg_income": [4, 5, 6],
         "log_unemployment": [0.1, 0.2, 0.3],
@@ -45,17 +47,17 @@ def test_prepare_dataframe_valid():
         "CLUSTER1": [0, 1, 0],
         "CLUSTER2": [0, 0, 1],
         "migration_rate": [10, 20, 30],
-        "year": [2010, 2011, 2012]
     })
 
     df_clean, feature_cols, target = prepare_dataframe(df)
 
     assert isinstance(df_clean, pd.DataFrame)
-    assert len(df_clean) == 3
+    # migration_lag1 is undefined for the first year -> 2 rows kept
+    assert len(df_clean) == 2
     assert target == "migration_rate"
     assert set(feature_cols) == {
         "log_rent_avg", "log_avg_income", "log_unemployment",
-        "log_schockexposure", "CLUSTER0", "CLUSTER1", "CLUSTER2"
+        "log_schockexposure", "CLUSTER0", "CLUSTER1", "CLUSTER2", "migration_lag1"
     }
 
 
@@ -73,6 +75,7 @@ def test_prepare_dataframe_missing_cols():
 def test_time_split_basic():
     """time_split should return four numpy arrays with correct shapes."""
     df = pd.DataFrame({
+        "canton": ["VD", "VD", "VD", "VD"],
         "log_rent_avg": [1, 2, 3, 4],
         "log_avg_income": [5, 6, 7, 8],
         "log_unemployment": [0.1, 0.2, 0.3, 0.4],
@@ -134,4 +137,3 @@ def test_feature_importance():
     assert len(feat_imp) == 3
     assert isinstance(feat_imp[0][0], str)
     assert isinstance(feat_imp[0][1], float)
-

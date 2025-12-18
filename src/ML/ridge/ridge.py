@@ -115,32 +115,72 @@ def time_split(df: pd.DataFrame, feature_cols):
 
 #standardized scaling
 def run_ridge(X_train, y_train, X_test, y_test, alphas):
-    scaler = StandardScaler()
-    X_train_scaled = scaler.fit_transform(X_train)
-    X_test_scaled  = scaler.transform(X_test)
+    """
+    Ridge training without test-set leakage:
+    - Split the provided training set into an inner train/validation split (time-ordered).
+    - Select alpha on the validation set only.
+    - Refit the scaler + best model on the full training set.
+    - Evaluate once on the (untouched) test set.
+    """
+
+    # ---- Inner train/validation split (keeps chronological order) ----
+    n_train = len(y_train)
+    if n_train < 3:
+        raise ValueError("Not enough training samples to run Ridge with validation split.")
+
+    cut = int(0.8 * n_train)
+    cut = max(1, min(cut, n_train - 1))  # ensure at least 1 obs in train and val
+
+    X_inner_train, y_inner_train = X_train[:cut], y_train[:cut]
+    X_val, y_val = X_train[cut:], y_train[cut:]
+
+    # Fit scaler only on inner-train (prevents leakage into validation)
+    scaler_inner = StandardScaler()
+    X_inner_train_scaled = scaler_inner.fit_transform(X_inner_train)
+    X_val_scaled = scaler_inner.transform(X_val)
 
     best_alpha = None
-    best_r2_test = -np.inf 
-    best_model = None
+    best_r2_val = -np.inf
 
+    # Keep results for reporting: (alpha, val_mse, train_r2, val_r2)
     results = []
-    
+
+    use_r2_for_selection = len(y_val) >= 2
+
+    best_metric = -np.inf
+
     for alpha in alphas:
-        model = Ridge(alpha=alpha)  # alpha = lambda
-        model.fit(X_train_scaled, y_train)
-        y_pred_train = model.predict(X_train_scaled)
-        y_pred_test  = model.predict(X_test_scaled)
+        alpha = float(alpha)
+        model = Ridge(alpha=alpha)
+        model.fit(X_inner_train_scaled, y_inner_train)
 
-        r2_train = r2_score(y_train, y_pred_train)
-        r2_test  = r2_score(y_test, y_pred_test)
-        mse_test = mean_squared_error(y_test, y_pred_test)
-        
-        results.append((alpha, mse_test, r2_train, r2_test))
+        y_pred_train = model.predict(X_inner_train_scaled)
+        y_pred_val = model.predict(X_val_scaled)
 
-        if r2_test > best_r2_test:
-            best_r2_test = r2_test
+        r2_train = r2_score(y_inner_train, y_pred_train)
+        mse_val = mean_squared_error(y_val, y_pred_val)
+        r2_val = r2_score(y_val, y_pred_val) if use_r2_for_selection else np.nan
+
+        results.append((alpha, mse_val, r2_train, r2_val))
+
+        metric = (r2_val if use_r2_for_selection else -mse_val)
+        if np.isnan(metric):
+            metric = -np.inf
+
+        if (best_alpha is None) or (metric > best_metric):
+            best_metric = metric
+            best_r2_val = r2_val if use_r2_for_selection else best_r2_val
             best_alpha = alpha
-            best_model = model
+
+    # ---- Refit on full training set with best alpha, then evaluate once on test ----
+    scaler = StandardScaler()
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+
+    best_model = Ridge(alpha=best_alpha)
+    best_model.fit(X_train_scaled, y_train)
+    y_pred_test = best_model.predict(X_test_scaled)
+    best_r2_test = r2_score(y_test, y_pred_test)
 
     return best_model, best_alpha, best_r2_test, results, scaler
 
@@ -206,6 +246,4 @@ if __name__ == "__main__":
     for f in feature_cols:
         print(f)
     print(coef_table.head(50).to_string())
-
-
 

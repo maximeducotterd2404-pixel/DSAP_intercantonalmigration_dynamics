@@ -38,15 +38,16 @@ def test_prepare_dataframe_valid():
     """prepare_dataframe doit retourner un df propre avec toutes les features."""
     
     df = pd.DataFrame({
-        "migration_rate": [0.1, 0.2],
-        "canton": ["VD", "GE"],
-        "year": [2015, 2016],
-        "Z_score_rent": [1, 2],
-        "avg_income_zscore": [0.5, 0.7],
-        "z-score_unemployment": [0.1, -0.2],
-        "shockexposure_zscore": [0.3, 0.4],
-        "CLUSTER1": [0, 1],
-        "CLUSTER2": [1, 0],
+        # Need at least 2 years per canton to compute migration_lag1
+        "migration_rate": [0.1, 0.2, 0.15, 0.25],
+        "canton": ["VD", "VD", "GE", "GE"],
+        "year": [2015, 2016, 2015, 2016],
+        "Z_score_rent": [1, 2, 1, 2],
+        "avg_income_zscore": [0.5, 0.7, 0.4, 0.6],
+        "z-score_unemployment": [0.1, -0.2, 0.2, -0.1],
+        "shockexposure_zscore": [0.3, 0.4, 0.35, 0.45],
+        "CLUSTER1": [0, 0, 1, 1],
+        "CLUSTER2": [1, 1, 0, 0],
     })
 
     df_prepared = prepare_dataframe(df)
@@ -54,6 +55,7 @@ def test_prepare_dataframe_valid():
     # verifications
     assert isinstance(df_prepared, pd.DataFrame)
     assert "canton_GE" in df_prepared.columns or "canton_VD" in df_prepared.columns
+    # With migration_lag1, one first-year observation is dropped per canton -> 2 rows kept
     assert df_prepared.shape[0] == 2  
 
 def test_prepare_dataframe_missing_cols():
@@ -97,7 +99,7 @@ def test_run_ridge_basic():
     X_test  = np.array([[1],[2]])
     y_test  = np.array([1,2])
 
-    model, best_alpha, best_r2, results = run_ridge(
+    model, best_alpha, best_r2, results, scaler = run_ridge(
         X_train, y_train, X_test, y_test,
         alphas=[0, 0.1, 1.0]
     )
@@ -107,3 +109,4 @@ def test_run_ridge_basic():
     assert isinstance(results, list)
     assert len(results) == 3
     assert best_r2 <= 1 and best_r2 >= -10
+    assert hasattr(scaler, "transform")

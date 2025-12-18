@@ -36,15 +36,16 @@ def test_prepare_dataframe_valid():
     """prepare_dataframe should return cleaned df + X + y + feature list."""
 
     df = pd.DataFrame({
-        "migration_rate": [0.1, 0.2, 0.3],
-        "canton": ["VD", "GE", "VS"],
-        "year": [2014, 2015, 2016],
-        "log_rent_avg": [1, 2, 3],
-        "log_avg_income": [10, 20, 30],
-        "log_unemployment": [0.5, 0.6, 0.7],
-        "log_schockexposure": [1.1, 1.2, 1.3],
-        "CLUSTER1": [1, 0, 0],
-        "CLUSTER2": [0, 1, 0],
+        # Need at least 2 years per canton to compute migration_lag1
+        "migration_rate": [0.1, 0.12, 0.2, 0.22, 0.3, 0.32],
+        "canton": ["VD", "VD", "GE", "GE", "VS", "VS"],
+        "year": [2014, 2015, 2014, 2015, 2014, 2015],
+        "log_rent_avg": [1, 1.1, 2, 2.1, 3, 3.1],
+        "log_avg_income": [10, 11, 20, 21, 30, 31],
+        "log_unemployment": [0.5, 0.55, 0.6, 0.65, 0.7, 0.75],
+        "log_schockexposure": [1.1, 1.15, 1.2, 1.25, 1.3, 1.35],
+        "CLUSTER1": [1, 1, 0, 0, 0, 0],
+        "CLUSTER2": [0, 0, 1, 1, 0, 0],
     })
 
     df_model, X_df, y_ser, feature_cols = prepare_dataframe(df)
@@ -54,7 +55,8 @@ def test_prepare_dataframe_valid():
     assert isinstance(y_ser, pd.Series)
     assert isinstance(feature_cols, list)
 
-    assert len(df_model) == 3   
+    # With migration_lag1, first year per canton is dropped -> 3 rows kept
+    assert len(df_model) == 3
     assert X_df.shape[0] == 3
     assert y_ser.shape[0] == 3
     assert len(feature_cols) > 6

@@ -32,10 +32,13 @@ def run_ols(data_path: Path) -> None:
     # Use the data_loader facade (wraps existing loader/prep)
     df_model, X_df, y_ser, feature_cols = dl.load_for_ols(data_path)
     X_train, X_test, y_train, y_test = ols_module.time_split(df_model, feature_cols)
-    _, y_pred, mse, r2, _, _ = mdl.train_ols(X_train, y_train, X_test, y_test)
+    model, y_pred, mse, r2, _, _ = mdl.train_ols(X_train, y_train, X_test, y_test)
+    from sklearn.metrics import r2_score
+    y_pred_train = model.predict(X_train)
+    r2_train = r2_score(y_train, y_pred_train)
 
     print("=== OLS ===")
-    print(f"MSE: {mse:.4f} | RMSE: {mse**0.5:.4f} | R2: {r2:.4f}")
+    print(f"Train R2: {r2_train:.4f} | Test R2: {r2:.4f} | Test RMSE: {mse**0.5:.4f}")
     print(f"Train rows: {len(y_train)} | Test rows: {len(y_test)}")
 
 
@@ -60,7 +63,7 @@ def run_ridge(data_path: Path) -> None:
     feature_cols = base_vars + interaction_vars + [c for c in df_model.columns if c.startswith("canton_")]
 
     X_train, X_test, y_train, y_test = ridge_module.time_split(df_model, feature_cols)
-    best_model, best_alpha, best_r2_test, _, scaler = mdl.train_ridge(
+    best_model, best_alpha, best_r2_test, results, scaler = mdl.train_ridge(
         X_train, y_train, X_test, y_test, alphas=[0, 0.0001, 0.001, 0.01, 0.1, 1.0, 10.0]
     )
 
@@ -74,9 +77,13 @@ def run_ridge(data_path: Path) -> None:
     r2_train = r2_score(y_train, y_pred_train)
     mse_test = mean_squared_error(y_test, y_pred_test)
 
+    # Alpha is selected on an inner validation split inside run_ridge (no test-set leakage)
+    val_row = next((row for row in results if row[0] == best_alpha), None)
+    r2_val = val_row[3] if val_row is not None else float("nan")
+
     print("=== Ridge Regression ===")
-    print(f"Best alpha: {best_alpha}")
-    print(f"Train R2: {r2_train:.4f} | Test R2: {best_r2_test:.4f} | Test MSE: {mse_test:.4f}")
+    print(f"Best alpha (selected on validation): {best_alpha}")
+    print(f"Train R2: {r2_train:.4f} | Val R2: {r2_val:.4f} | Test R2: {best_r2_test:.4f} | Test MSE: {mse_test:.4f}")
     print(f"Train rows: {len(y_train)} | Test rows: {len(y_test)}")
 
 
