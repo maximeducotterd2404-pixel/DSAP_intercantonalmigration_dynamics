@@ -4,7 +4,11 @@
 """
 WHAT-IF SCENARIO TOOL
 Compatible with the boosting script
+Bonus script: illustrative what-if tool to explore policy-style scenarios (simplified)
+Note: This is a lightweight prototype. A production-ready policy tool would need
+more robust modeling, validation, and operational safeguards.
 """
+
 
 import numpy as np
 import pandas as pd
