@@ -115,13 +115,6 @@ def time_split(df: pd.DataFrame, feature_cols):
 
 #standardized scaling
 def run_ridge(X_train, y_train, X_test, y_test, alphas):
-    """
-    Ridge training without test-set leakage:
-    - Split the provided training set into an inner train/validation split (time-ordered).
-    - Select alpha on the validation set only.
-    - Refit the scaler + best model on the full training set.
-    - Evaluate once on the (untouched) test set.
-    """
 
     # ---- Inner train/validation split (keeps chronological order) ----
     n_train = len(y_train)
@@ -145,12 +138,7 @@ def run_ridge(X_train, y_train, X_test, y_test, alphas):
     # Keep results for reporting: (alpha, val_mse, train_r2, val_r2)
     results = []
 
-    use_r2_for_selection = len(y_val) >= 2
-
-    best_metric = -np.inf
-
     for alpha in alphas:
-        alpha = float(alpha)
         model = Ridge(alpha=alpha)
         model.fit(X_inner_train_scaled, y_inner_train)
 
@@ -158,18 +146,13 @@ def run_ridge(X_train, y_train, X_test, y_test, alphas):
         y_pred_val = model.predict(X_val_scaled)
 
         r2_train = r2_score(y_inner_train, y_pred_train)
+        r2_val = r2_score(y_val, y_pred_val)
         mse_val = mean_squared_error(y_val, y_pred_val)
-        r2_val = r2_score(y_val, y_pred_val) if use_r2_for_selection else np.nan
 
         results.append((alpha, mse_val, r2_train, r2_val))
 
-        metric = (r2_val if use_r2_for_selection else -mse_val)
-        if np.isnan(metric):
-            metric = -np.inf
-
-        if (best_alpha is None) or (metric > best_metric):
-            best_metric = metric
-            best_r2_val = r2_val if use_r2_for_selection else best_r2_val
+        if r2_val > best_r2_val:
+            best_r2_val = r2_val
             best_alpha = alpha
 
     # ---- Refit on full training set with best alpha, then evaluate once on test ----
@@ -246,4 +229,5 @@ if __name__ == "__main__":
     for f in feature_cols:
         print(f)
     print(coef_table.head(50).to_string())
+
 
