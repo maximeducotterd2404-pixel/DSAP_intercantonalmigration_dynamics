@@ -1,0 +1,12 @@
+name: dsap_intercantonal_dynamics
+channels:
+  - conda-forge
+dependencies:
+  - python=3.13
+  - pip
+  - pip:
+      - numpy
+      - pandas
+      - scikit-learn
+      - matplotlib
+      - pytest
