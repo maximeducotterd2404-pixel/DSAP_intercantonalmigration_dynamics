@@ -28,7 +28,6 @@ Console outputs:
 ## Data
 - Cleaned dataset: `data/databasecsv.csv`
 - Raw sources (OFS/BFS, SNB) used to build the dataset are included under `data/raw/` for reference.
-- A full reconstruction script is not provided; the project is reproducible for modeling results using the cleaned dataset above.
 
 ## Tests
 - Run: `pytest`

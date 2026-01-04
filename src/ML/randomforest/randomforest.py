@@ -122,10 +122,10 @@ def time_split(df: pd.DataFrame, feature_cols, target_col):
 def run_random_forest(X_train, y_train, X_test, y_test):
 
     rf = RandomForestRegressor(
-        n_estimators=300,
+    n_estimators=300,
         max_depth=6,
         min_samples_leaf=5,
-        max_features="sqrt",
+        max_features=0.5,
         random_state=0,
         n_jobs=-1
     )
