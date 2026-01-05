@@ -37,14 +37,23 @@ def prepare_matrix(df, feature_cols=FEATURE_COLS):
     missing = [c for c in feature_cols if c not in df.columns]
     if missing:
         raise KeyError(f"Missing required columns: {missing}")
+    if "canton" not in df.columns:
+        raise KeyError("Missing required column: canton")
 
-    df_clean = df.dropna(subset=feature_cols).copy()
-    X = df_clean[feature_cols].apply(pd.to_numeric, errors="coerce")
+    df_clean = df.dropna(subset=feature_cols + ["canton"]).copy()
+    df_clean["canton"] = df_clean["canton"].astype(str).str.strip()
 
-    if X.isna().any().any():
+    for col in feature_cols:
+        df_clean[col] = pd.to_numeric(df_clean[col], errors="coerce")
+
+    if df_clean[feature_cols].isna().any().any():
         raise ValueError("NaN detected after conversion to numeric.")
 
-    return df_clean, X.to_numpy()
+    # Long-run canton averages: one row per canton for clustering
+    df_canton = df_clean.groupby("canton", as_index=False)[feature_cols].mean()
+    X = df_canton[feature_cols].to_numpy()
+
+    return df_canton, X
 
 
 # run kmeans
@@ -73,16 +82,11 @@ def main():
     print(profiles)
 
     print("\n=== FIRST ROWS WITH CLUSTERS ===")
-    cols_show = ["canton", "year", "cluster"] + FEATURE_COLS
+    cols_show = ["canton", "cluster"] + FEATURE_COLS
     print(df_clustered[cols_show].head())
 
-    print("\n=== MAIN CLUSTER PER CANTON ===")
-    canton_main = (
-        df_clustered.groupby("canton")["cluster"]
-        .agg(lambda s: s.value_counts().idxmax())
-        .reset_index()
-        .sort_values("cluster")
-    )
+    print("\n=== CLUSTER PER CANTON ===")
+    canton_main = df_clustered[["canton", "cluster"]].sort_values("cluster")
     print(canton_main)
 
     # === NEW : PLOT RADAR ===

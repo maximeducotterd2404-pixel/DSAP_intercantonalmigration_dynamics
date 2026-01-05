@@ -22,6 +22,9 @@ def load_data(path=None):
     try:
         df = pd.read_csv(path, sep=";")
         df.columns = df.columns.str.strip()
+        rename_map = {c: c.replace("CLUSTER ", "CLUSTER") for c in df.columns if c.startswith("CLUSTER ")}
+        if rename_map:
+            df = df.rename(columns=rename_map)
         return df
     except FileNotFoundError:
         raise FileNotFoundError(f"Dataset not found at {path}")
@@ -229,5 +232,4 @@ if __name__ == "__main__":
     for f in feature_cols:
         print(f)
     print(coef_table.head(50).to_string())
-
 

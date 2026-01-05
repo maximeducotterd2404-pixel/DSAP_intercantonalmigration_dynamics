@@ -21,6 +21,9 @@ def load_data(path=None):
     try:
         df = pd.read_csv(path, sep=";")
         df.columns = df.columns.str.strip()
+        rename_map = {c: c.replace("CLUSTER ", "CLUSTER") for c in df.columns if c.startswith("CLUSTER ")}
+        if rename_map:
+            df = df.rename(columns=rename_map)
         return df
     except FileNotFoundError:
         raise FileNotFoundError(f"Dataset not found at {path}")
@@ -198,5 +201,4 @@ if __name__ == "__main__":
         print(f"{name:40s}  {coef:.6f}")
 
     print(f"\nIntercept: {intercept:.6f}")
-
 

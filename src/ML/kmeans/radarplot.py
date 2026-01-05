@@ -17,7 +17,6 @@ FEATURE_MAP = [
 ]
 
 def _build_profiles(df):
-    
     # constructing of the profiles DataFrame
     df = df.copy()
 
@@ -25,10 +24,20 @@ def _build_profiles(df):
     missing = [col for col, _ in FEATURE_MAP if col not in df.columns]
     if missing:
         raise ValueError(f"Missing columns in df : {missing}")
+    if "canton" not in df.columns:
+        raise ValueError("Missing column in df: canton")
+    if "cluster" not in df.columns:
+        raise ValueError("Missing column in df: cluster")
 
     df["canton"] = df["canton"].astype(str).str.strip()
 
     feature_cols = [col for col, _ in FEATURE_MAP]
+
+    if df["canton"].duplicated().any():
+        # Collapse to one row per canton (mean features, dominant cluster)
+        agg_map = {col: "mean" for col in feature_cols}
+        agg_map["cluster"] = lambda s: s.value_counts().idxmax()
+        df = df.groupby("canton", as_index=False).agg(agg_map)
 
     # average profiles per cluster
     profiles = df.groupby("cluster")[feature_cols].mean()
@@ -43,8 +52,7 @@ def _build_profiles(df):
     return profiles
 
 
-def plot_cluster_radar(df, title="Cluster profiles (K-means)"):
-    
+def plot_cluster_radar(df, title="Cluster profiles (K-means, canton averages)"):
     "plot radart chart of cluster profiles"
 
     profiles = _build_profiles(df)
