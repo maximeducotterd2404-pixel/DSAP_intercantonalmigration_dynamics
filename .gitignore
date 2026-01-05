@@ -198,6 +198,10 @@ cython_debug/
 .pypirc
 
 # Cursor
+.cursor/
+
+# Local LaTeX report build/output (keep out of GitHub)
+dsap_latex-2/
 #  Cursor is an AI-powered code editor. `.cursorignore` specifies files/directories to
 #  exclude from AI features like autocomplete and code analysis. Recommended for sensitive data
 #  refer to https://docs.cursor.com/context/ignore-files
