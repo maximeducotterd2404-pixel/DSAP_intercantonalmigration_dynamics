@@ -5,12 +5,14 @@ This project studies inter-cantonal migration dynamics in Switzerland and evalua
 
 ## Setup
 - Python 3.10+ recommended (project tested with Python 3.13).
+- From the project root (e.g., `cd /path/to/DSAP_intercantonal_dynamics`).
 - Install dependencies:
   - `pip install -r requirements.txt`
   - or `conda env create -f environment.yml`
+- If using conda, activate the environment: `conda activate dsap_intercantonal_dynamics`.
 
 ## Running the project (main.py)
-Entry point: `python main.py --model {ols|ridge|randomforest|gradientboosting|decisiontree|all} [--data PATH]`
+Entry point: `python main.py --model {ols|ridge|randomforest|gradientboosting|decisiontree|kmeans|all} [--data PATH] [--non-interactive]`
 
 - Data defaults to `data/databasecsv.csv`.
 - Override with `--data /path/to/file.csv`.
@@ -18,12 +20,14 @@ Entry point: `python main.py --model {ols|ridge|randomforest|gradientboosting|de
 Examples:
 - `python main.py --model all`
 - `python main.py --model ridge --data /absolute/path/to/databasecsv.csv`
+- `python main.py --model kmeans --non-interactive`
 
 Console outputs:
 - OLS: Train/Test R² + Test RMSE
 - Ridge: Train/Val/Test R² + Test MSE (alpha selected on validation)
 - RF/GB: Train/Test R² + Test RMSE + feature importances
 - Decision Tree: accuracy (direction of migration change)
+- KMeans: inertia + cluster profiles + radar plot (saved in `results/`)
 
 ## Data
 - Cleaned dataset: `data/databasecsv.csv`

@@ -188,7 +188,7 @@ def interactive_what_if(df_original, df_model, feature_cols, model):
     print(f"  INPUT VALUES FOR {canton_choice} IN {year}")
     print(f"{'='*70}\n")
     print("(Press ENTER to keep the default value)\n")
-    print("⚠️  IMPORTANT: Enter normal values (not logs)\n")
+    print("  IMPORTANT: Enter normal values (not logs)\n")
     
     # Retrieve normal (non-log) values from previous year
     prev_rent = np.exp(row_prev["log_rent_avg"]) - 1
@@ -209,7 +209,7 @@ def interactive_what_if(df_original, df_model, feature_cols, model):
     # shockexposure remains constant (keep previous)
     shock_t = prev_shock
     
-    print(f"\nℹ️  shockexposure (constant): {shock_t:.2f}")
+    print(f"\nℹ shockexposure (constant): {shock_t:.2f}")
     
     # Compute logs automatically
     log_rent_t = np.log(rent_t + 1)

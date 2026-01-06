@@ -7,6 +7,7 @@ Supported models:
   - randomforest
   - gradientboosting
   - decisiontree
+  - kmeans
 Use --model all to run them sequentially.
 """
 
@@ -24,10 +25,23 @@ from src.ML.ridge import ridge as ridge_module
 from src.ML.randomforest import randomforest as rf_module
 from src.ML.Gradientboosting import gradientboosting as gb_module
 from src.ML import decisiontree as dt_module
+from src.ML.kmeans import kmeans as km_module
 
 
 # default dataset path
 DATA_DEFAULT = Path(__file__).resolve().parent / "data" / "databasecsv.csv"
+
+def configure_matplotlib(non_interactive: bool) -> None:
+    if not non_interactive:
+        return
+
+    import os
+    os.environ.setdefault("MPLBACKEND", "Agg")
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    plt.ioff()
+    plt.show = lambda *args, **kwargs: None
 
 
 def run_ols(data_path: Path) -> None:
@@ -43,6 +57,8 @@ def run_ols(data_path: Path) -> None:
     print("=== OLS ===")
     print(f"Train R2: {r2_train:.4f} | Test R2: {r2:.4f} | Test RMSE: {mse**0.5:.4f}")
     print(f"Train rows: {len(y_train)} | Test rows: {len(y_test)}")
+    plot_path = evl.plot_ols_true_vs_pred(y_test, y_pred)
+    print(f"Saved plot: {plot_path}")
 
 
 def run_ridge(data_path: Path) -> None:
@@ -91,13 +107,15 @@ def run_ridge(data_path: Path) -> None:
     print(f"Best alpha (selected on validation): {best_alpha}")
     print(f"Train R2: {r2_train:.4f} | Val R2: {r2_val:.4f} | Test R2: {best_r2_test:.4f} | Test MSE: {mse_test:.4f}")
     print(f"Train rows: {len(y_train)} | Test rows: {len(y_test)}")
+    plot_path = evl.plot_ridge_true_vs_pred(y_test, y_pred_test)
+    print(f"Saved plot: {plot_path}")
 
 
 def run_randomforest(data_path: Path) -> None:
     # load and split data
     df, feature_cols, target_col = dl.load_for_randomforest(data_path)
     X_train, X_test, y_train, y_test = rf_module.time_split(df, feature_cols, target_col)
-    rf, _, r2_test, rmse, r2_train = mdl.train_randomforest(X_train, y_train, X_test, y_test)
+    rf, y_pred, r2_test, rmse, r2_train = mdl.train_randomforest(X_train, y_train, X_test, y_test)
     feat_imp = rf_module.get_feature_importance(rf, feature_cols)[:5]
     metrics = evl.eval_randomforest(rf, X_train, y_train, X_test, y_test)
 
@@ -106,6 +124,8 @@ def run_randomforest(data_path: Path) -> None:
     print("Top feature importances (name, importance):")
     for name, score in feat_imp:
         print(f"  {name:25s} {score:.4f}")
+    plot_path = evl.plot_randomforest_true_vs_pred(y_test, y_pred)
+    print(f"Saved plot: {plot_path}")
 
 
 def run_gradientboosting(data_path: Path) -> None:
@@ -123,6 +143,9 @@ def run_gradientboosting(data_path: Path) -> None:
     print("Top feature importances (name, importance):")
     for name, score in sorted_imp:
         print(f"  {name:25s} {score:.4f}")
+    y_pred_test = model.predict(X_test)
+    plot_path = evl.plot_gradientboosting_true_vs_pred(y_test, y_pred_test)
+    print(f"Saved plot: {plot_path}")
 
 
 def run_decisiontree(data_path: Path) -> None:
@@ -137,6 +160,21 @@ def run_decisiontree(data_path: Path) -> None:
     print(f"Train rows: {len(y_train)} | Test rows: {len(y_test)}")
 
 
+def run_kmeans(data_path: Path) -> None:
+    df = km_module.load_data(data_path)
+    df_clean, X = km_module.prepare_matrix(df)
+    model = km_module.run_kmeans(X, k=3, random_state=0)
+    df_clustered = km_module.assign_clusters(df_clean, model)
+
+    print("=== KMeans (clustering) ===")
+    print(f"Total inertia: {model.inertia_:.4f}")
+    profiles = df_clustered.groupby("cluster")[km_module.FEATURE_COLS].mean().round(3)
+    print("Cluster profiles (mean by cluster):")
+    print(profiles)
+    plot_path = evl.plot_kmeans_radar(df_clustered)
+    print(f"Saved plot: {plot_path}")
+
+
 def parse_args() -> argparse.Namespace:
     # CLI arguments
     parser = argparse.ArgumentParser(
@@ -144,7 +182,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--model",
-        choices=["ols", "ridge", "randomforest", "gradientboosting", "decisiontree", "all"],
+        choices=["ols", "ridge", "randomforest", "gradientboosting", "decisiontree", "kmeans", "all"],
         default="ols",
         help="Which model to run (use 'all' to run every model in sequence).",
     )
@@ -154,6 +192,16 @@ def parse_args() -> argparse.Namespace:
         default=DATA_DEFAULT,
         help=f"Path to the data CSV (default: {DATA_DEFAULT})",
     )
+    parser.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help="Disable interactive plotting (no GUI windows).",
+    )
+    parser.add_argument(
+        "--no-show",
+        action="store_true",
+        help="Alias for --non-interactive.",
+    )
     return parser.parse_args()
 
 
@@ -161,6 +209,9 @@ def main() -> int:
     # entry point for the script
     args = parse_args()
     data_path = args.data
+    non_interactive = args.non_interactive or args.no_show
+
+    configure_matplotlib(non_interactive)
 
     if not data_path.exists():
         print(f"Dataset not found at {data_path}", file=sys.stderr)
@@ -173,6 +224,7 @@ def main() -> int:
         "randomforest": run_randomforest,
         "gradientboosting": run_gradientboosting,
         "decisiontree": run_decisiontree,
+        "kmeans": run_kmeans,
     }
 
     # choose models to run
