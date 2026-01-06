@@ -29,6 +29,12 @@ Console outputs:
 - Decision Tree: accuracy (direction of migration change)
 - KMeans: inertia + cluster profiles + radar plot (saved in `results/`)
 
+Detailed results with coefficients: run the model-specific prediction scripts from the project root. 
+- `python src/ML/ols/ols.py` 
+- `python src/ML/ridge/ridge.py` 
+- `python src/ML/ridge/randomforest.py`
+- `python src/ML/ridge/gradientboosting.py`
+
 ## Data
 - Cleaned dataset: `data/databasecsv.csv`
 - Raw sources (OFS/BFS, SNB) used to build the dataset are included under `data/raw/` for reference.
