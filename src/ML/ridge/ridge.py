@@ -127,6 +127,9 @@ def time_split(df: pd.DataFrame, feature_cols):
 #standardized scaling
 def run_ridge(X_train, y_train, X_test, y_test, alphas):
 
+    if not alphas:
+        raise ValueError("alphas must contain at least one value.")
+
     # ---- Inner train/validation split (keeps chronological order) ----
     n_train = len(y_train)
     if n_train < 3:
@@ -144,7 +147,7 @@ def run_ridge(X_train, y_train, X_test, y_test, alphas):
     X_val_scaled = scaler_inner.transform(X_val)
 
     best_alpha = None
-    best_r2_val = -np.inf
+    best_score = -np.inf
 
     # Keep results for reporting: (alpha, val_mse, train_r2, val_r2)
     results = []
@@ -163,8 +166,11 @@ def run_ridge(X_train, y_train, X_test, y_test, alphas):
 
         results.append((alpha, mse_val, r2_train, r2_val))
 
-        if r2_val > best_r2_val:
-            best_r2_val = r2_val
+        # Fallback to MSE when R2 is undefined (e.g., single-sample validation).
+        score = r2_val if not np.isnan(r2_val) else -mse_val
+
+        if best_alpha is None or score > best_score:
+            best_score = score
             best_alpha = alpha
 
     # ---- Refit on full training set with best alpha, then evaluate once on test ----

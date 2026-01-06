@@ -41,12 +41,13 @@ def prepare_matrix(df, feature_cols=FEATURE_COLS):
     missing = [c for c in feature_cols if c not in df.columns]
     if missing:
         raise KeyError(f"Missing required columns: {missing}")
-    if "canton" not in df.columns:
-        raise KeyError("Missing required column: canton")
 
     # drop rows with missing values
-    df_clean = df.dropna(subset=feature_cols + ["canton"]).copy()
-    df_clean["canton"] = df_clean["canton"].astype(str).str.strip()
+    if "canton" in df.columns:
+        df_clean = df.dropna(subset=feature_cols + ["canton"]).copy()
+        df_clean["canton"] = df_clean["canton"].astype(str).str.strip()
+    else:
+        df_clean = df.dropna(subset=feature_cols).copy()
 
     # force numeric for features
     for col in feature_cols:
@@ -55,11 +56,14 @@ def prepare_matrix(df, feature_cols=FEATURE_COLS):
     if df_clean[feature_cols].isna().any().any():
         raise ValueError("NaN detected after conversion to numeric.")
 
-    # Long-run canton averages: one row per canton for clustering
-    df_canton = df_clean.groupby("canton", as_index=False)[feature_cols].mean()
-    X = df_canton[feature_cols].to_numpy()
+    if "canton" in df_clean.columns:
+        # Long-run canton averages: one row per canton for clustering
+        df_canton = df_clean.groupby("canton", as_index=False)[feature_cols].mean()
+        X = df_canton[feature_cols].to_numpy()
+        return df_canton, X
 
-    return df_canton, X
+    X = df_clean[feature_cols].to_numpy()
+    return df_clean, X
 
 
 # run kmeans

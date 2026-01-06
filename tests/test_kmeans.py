@@ -12,10 +12,10 @@ from src.ML.kmeans.kmeans import (
     assign_clusters,
     FEATURE_COLS
 )
-# test kmeans-.py
+# Test kmeans.py
 
 def test_load_data_success(tmp_path):
-    """load_data doit charger un fichier CSV valide."""
+    """load_data should load a valid CSV file."""
     # Create fake csv
     file = tmp_path / "fake.csv"
     df_test = pd.DataFrame({"A": [1, 2]})
@@ -27,14 +27,14 @@ def test_load_data_success(tmp_path):
 
 
 def test_load_data_missing_file():
-    """load_data doit lever une erreur si le fichier n’existe pas."""
+    """load_data should raise an error if the file does not exist."""
     with pytest.raises(FileNotFoundError):
         load_data(path="THIS_FILE_DOES_NOT_EXIST.csv")
 
 
 # test matrix preparation
 def test_prepare_matrix_valid():
-    """prepare_matrix doit retourner df_clean et X numpy matrix."""
+    """prepare_matrix should return df_clean and X as a numpy matrix."""
     df = pd.DataFrame({
         "Z_score_rent": [0.1, 0.2],
         "avg_income_zscore": [1.0, 0.5],
@@ -52,7 +52,7 @@ def test_prepare_matrix_valid():
 
 
 def test_prepare_matrix_missing_columns():
-    """prepare_matrix doit lever une erreur quand il manque des colonnes."""
+    """prepare_matrix should raise an error when columns are missing."""
     df = pd.DataFrame({"wrong_col": [1, 2, 3]})
 
     with pytest.raises(KeyError):
@@ -62,7 +62,7 @@ def test_prepare_matrix_missing_columns():
 # test run_kmeans
 
 def test_run_kmeans_basic():
-    """run_kmeans doit fitter un modèle avec k clusters."""
+    """run_kmeans should fit a model with k clusters."""
     # simple dataset
     X = np.array([[0], [1], [2], [10], [11], [12]])
 
@@ -76,7 +76,7 @@ def test_run_kmeans_basic():
 # test assign_cluster
 
 def test_assign_clusters():
-    """assign_clusters doit ajouter une colonne cluster."""
+    """assign_clusters should add a cluster column."""
     df = pd.DataFrame({"a": [1, 2, 3]})
     X = np.array([[0], [1], [2]])
 
