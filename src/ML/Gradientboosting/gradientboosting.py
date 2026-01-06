@@ -12,11 +12,14 @@ from sklearn.metrics import r2_score, mean_squared_error
 # 1. Load data
 def load_data(path=None):
     if path is None:
+        # default dataset path
         ROOT = Path(__file__).resolve().parents[3]
         path = ROOT / "data" / "databasecsv.csv"
 
     try:
+        # read csv with ; separator
         df = pd.read_csv(path, sep=";")
+        # clean column names
         df.columns = df.columns.str.strip()
         return df
     except Exception as e:
@@ -34,7 +37,7 @@ def engineer_features(df):
     # 1) Lag of migration
     df["migration_lag1"] = df.groupby("canton_id")["migration_rate"].shift(1)
 
-    # 2) Differences (Δ)
+    # 2) Differences (Delta)
     for col in ["log_rent_avg", "log_avg_income", "log_unemployment", "log_schockexposure"]:
         df[f"d_{col}"] = df.groupby("canton_id")[col].diff()
 
@@ -51,6 +54,7 @@ def engineer_features(df):
 
 def prepare_dataframe(df):
 
+    # base feature list
     base_features = [
         "log_rent_avg",
         "log_avg_income",
@@ -64,11 +68,13 @@ def prepare_dataframe(df):
         "t",
     ]
 
+    # fixed effects columns
     fe_cols = [c for c in df.columns if c.startswith("FE_")]
 
     feature_cols = base_features + fe_cols
     target_col = "migration_rate"
 
+    # drop missing values
     df = df.dropna(subset=feature_cols + [target_col]).copy()
 
     return df, feature_cols, target_col
@@ -79,6 +85,7 @@ def prepare_dataframe(df):
 
 def time_split(df, feature_cols, target_col):
 
+    # sort by year to avoid leakage
     df = df.sort_values("year")
 
     years = df["year"].unique()
@@ -104,6 +111,7 @@ def time_split(df, feature_cols, target_col):
 
 def train_boosting(X_train, y_train):
     
+    # Gradient Boosting model with chosen params
     model = GradientBoostingRegressor(
     loss="squared_error",
     n_estimators=80,   
@@ -124,9 +132,11 @@ def train_boosting(X_train, y_train):
 
 def evaluate(model, X_train, y_train, X_test, y_test):
 
+    # predictions on train/test
     y_pred_train = model.predict(X_train)
     y_pred_test  = model.predict(X_test)
 
+    # metrics
     train_r2 = r2_score(y_train, y_pred_train)
     test_r2  = r2_score(y_test, y_pred_test)
     rmse     = np.sqrt(mean_squared_error(y_test, y_pred_test))
@@ -158,6 +168,7 @@ if __name__ == "__main__":
     print(f"Test RMSE: {rmse:.4f}")
 
     print("\n=== FEATURE IMPORTANCE ===")
+    # show importance values
     importance = dict(zip(features, model.feature_importances_))
     for k, v in sorted(importance.items(), key=lambda x: -x[1]):
         print(f"{k:25s}: {v:.4f}")

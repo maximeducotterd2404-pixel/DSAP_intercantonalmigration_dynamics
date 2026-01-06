@@ -4,7 +4,7 @@ from sklearn.cluster import KMeans
 from pathlib import Path
 from .radarplot import plot_cluster_radar
 
-# configuration of features ton use
+# configuration of features to use
 FEATURE_COLS = [
     "Z_score_rent",
     "avg_income_zscore",
@@ -17,11 +17,14 @@ FEATURE_COLS = [
 # data loading function
 def load_data(path=None):
     if path is None:
+        # default dataset path
         ROOT = Path(__file__).resolve().parents[3]
         path = ROOT / "data" / "databasecsv.csv"
 
     try:
+        # read csv with ; separator
         df = pd.read_csv(path, sep=";")
+        # clean column names
         df.columns = df.columns.str.strip()
         return df
     except FileNotFoundError:
@@ -34,15 +37,18 @@ def load_data(path=None):
 # matrix preparation
 
 def prepare_matrix(df, feature_cols=FEATURE_COLS):
+    # check needed columns
     missing = [c for c in feature_cols if c not in df.columns]
     if missing:
         raise KeyError(f"Missing required columns: {missing}")
     if "canton" not in df.columns:
         raise KeyError("Missing required column: canton")
 
+    # drop rows with missing values
     df_clean = df.dropna(subset=feature_cols + ["canton"]).copy()
     df_clean["canton"] = df_clean["canton"].astype(str).str.strip()
 
+    # force numeric for features
     for col in feature_cols:
         df_clean[col] = pd.to_numeric(df_clean[col], errors="coerce")
 
@@ -58,17 +64,20 @@ def prepare_matrix(df, feature_cols=FEATURE_COLS):
 
 # run kmeans
 def run_kmeans(X, k=3, random_state=0):
+    # basic sklearn KMeans
     model = KMeans(n_clusters=k, random_state=random_state, n_init=10)
     model.fit(X)
     return model
 
 
 def assign_clusters(df_clean, model):
+    # assign model labels to df
     df_out = df_clean.copy()
     df_out["cluster"] = model.labels_
     return df_out
 
 def main():
+    # run everything end to end
     df = load_data()
     df_clean, X = prepare_matrix(df)
     model = run_kmeans(X, k=3)

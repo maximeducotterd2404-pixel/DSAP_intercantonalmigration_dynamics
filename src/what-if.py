@@ -23,11 +23,14 @@ from sklearn.metrics import r2_score, mean_squared_error
 
 def load_data(path=None):
     if path is None:
+        # default dataset path
         ROOT = Path(__file__).resolve().parents[1]
         path = ROOT / "data" / "databasecsv.csv"
 
     try:
+        # read csv with ; separator
         df = pd.read_csv(path, sep=";")
+        # clean column names
         df.columns = df.columns.str.strip()
         return df
     except Exception as e:
@@ -47,7 +50,7 @@ def engineer_features(df):
     # 1) Lag of migration
     df["migration_lag1"] = df.groupby("canton_id")["migration_rate"].shift(1)
 
-    # 2) Differences (Δ)
+    # 2) Differences (Delta)
     for col in ["log_rent_avg", "log_avg_income", "log_unemployment", "log_schockexposure"]:
         df[f"d_{col}"] = df.groupby("canton_id")[col].diff()
 
@@ -66,6 +69,7 @@ def engineer_features(df):
 # =====================================================================
 
 def prepare_dataframe(df):
+    # base features list
     base_features = [
         "log_rent_avg",
         "log_avg_income",
@@ -79,10 +83,12 @@ def prepare_dataframe(df):
         "t",
     ]
 
+    # fixed effects columns
     fe_cols = [c for c in df.columns if c.startswith("FE_")]
     feature_cols = base_features + fe_cols
     target_col = "migration_rate"
 
+    # drop missing rows
     df = df.dropna(subset=feature_cols + [target_col]).copy()
 
     return df, feature_cols, target_col
@@ -93,6 +99,7 @@ def prepare_dataframe(df):
 # =====================================================================
 
 def time_split(df, feature_cols, target_col):
+    # time split by year (no leakage)
     df = df.sort_values("year")
 
     years = df["year"].unique()
@@ -104,6 +111,7 @@ def time_split(df, feature_cols, target_col):
     df_train = df[df["year"].isin(train_years)]
     df_test = df[df["year"].isin(test_years)]
 
+    # build train/test arrays
     X_train = df_train[feature_cols].to_numpy()
     y_train = df_train[target_col].to_numpy()
 
@@ -118,6 +126,7 @@ def time_split(df, feature_cols, target_col):
 # =====================================================================
 
 def train_boosting(X_train, y_train):
+    # same params as main boosting
     model = GradientBoostingRegressor(
         loss="squared_error",
         n_estimators=80,
@@ -141,6 +150,7 @@ def interactive_what_if(df_original, df_model, feature_cols, model):
     """
     Interactive mode to build what-if scenarios
     """
+    # just a simple CLI flow
     print("\n" + "="*70)
     print("  WHAT-IF SCENARIO TOOL")
     print("="*70 + "\n")
@@ -156,6 +166,7 @@ def interactive_what_if(df_original, df_model, feature_cols, model):
     if canton_choice not in cantons:
         raise ValueError(f"Invalid canton '{canton_choice}'.")
     
+    # filter data for that canton
     df_canton = df_model[df_model["canton"] == canton_choice].sort_values("year")
     
     # --- 2) Select year ---
@@ -169,6 +180,7 @@ def interactive_what_if(df_original, df_model, feature_cols, model):
     if year - 1 not in df_canton["year"].values:
         raise ValueError(f"No data for {year-1}. Cannot compute lags/diffs.")
     
+    # get last year row for lags
     row_prev = df_canton[df_canton["year"] == year - 1].iloc[0]
     
     # --- 3) Input variables ---
@@ -290,6 +302,7 @@ def interactive_what_if(df_original, df_model, feature_cols, model):
 
 if __name__ == "__main__":
     
+    # main script flow
     print("\n" + "="*70)
     print("  LOADING AND TRAINING MODEL")
     print("="*70 + "\n")

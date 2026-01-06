@@ -10,11 +10,14 @@ from pyfixest.estimation import feols
 # Load and trying to prepare the data
 def load_data(path=None):
     if path is None:
+        # default dataset path
         ROOT = Path(__file__).resolve().parents[2]
         path = ROOT / "data" / "databasecsv.csv"
 
     try:
+        # read csv with ; separator
         df = pd.read_csv(path, sep=";")
+        # clean column names
         df.columns = df.columns.str.strip()
         return df
     except FileNotFoundError:
@@ -24,7 +27,7 @@ def load_data(path=None):
     except Exception as e:
         raise RuntimeError(f"Unexpected error loading dataset: {e}")
     
-#Formula for the fixed effect regression
+# Formula for the fixed effect regression
 FORMULA = (
     "migration_rate ~ log_rent_avg + log_avg_income + log_unemployment + "
     "shock_exposure + "
@@ -32,13 +35,13 @@ FORMULA = (
     "shockexposure_x_CLUSTER1 + shockexposure_x_CLUSTER2 | "
     "canton"
 )
-# Error standard clusering.
+# Error standard clustering.
 CLUSTER_SPEC = "canton"
 
-#Build a summary of the regression rsults
+# Build a summary of the regression results
 def format_summary(title, tidy_df, r2, mse, rmse, n_obs, cluster_spec):
     """Build a regression summary."""
-# control the formatting numbers
+    # control the formatting numbers
     def fmt(value, width=10, precision=4):
         if pd.notna(value):
             return f"{value:>{width}.{precision}f}"
@@ -67,19 +70,20 @@ def format_summary(title, tidy_df, r2, mse, rmse, n_obs, cluster_spec):
     lines.append("-" * 60)
     return "\n".join(lines)
 
-# determine the function to run the reression
+# determine the function to run the regression
 def main():
     """charge data, construct the model."""
 
     ROOT = Path(__file__).resolve().parents[2]
     DATA_PATH = ROOT / "data" / "databasecsv.csv"
 
+    # load data
     df = pd.read_csv(DATA_PATH, sep=";")
     df.columns = df.columns.str.strip()
 
     print(f"Loaded {len(df)} rows\n")
 
-    # variable used in the regression
+    # variables used in the regression
     base_vars = [
         "log_rent_avg",
         "log_avg_income",
@@ -139,14 +143,13 @@ def main():
         print("No valid data remaining!")
         return
 
-    # FE estimation with clustered sdandard errors.
+    # FE estimation with clustered standard errors
     try:
         result = feols(FORMULA, data=df_model, vcov={"CRV1": CLUSTER_SPEC})
     except Exception as e:
         raise RuntimeError(f"Fixed-effects regression failed: {e}")
 
-
-    # construct of residuals and metrics to construct mse, rmse, r2 within
+    # construct residuals and metrics (mse, rmse, within r2)
     y_true = df_model["migration_rate"].to_numpy()
     try:
         y_pred = result.predict()
@@ -168,14 +171,14 @@ def main():
     tidy_df = result.tidy()
 
     # marginal effects calculation
-    coefs = result.coef() #get the coefficent from the regression
+    coefs = result.coef() # get the coefficient from the regression
 
     b0 = coefs.get("shock_exposure", np.nan)
     b1 = coefs.get("shockexposure_x_CLUSTER1", 0)
     b2 = coefs.get("shockexposure_x_CLUSTER2", 0)
 
 
-    # calulate the marginal effects for each cluster
+    # calculate the marginal effects for each cluster
     eff_cluster0 = b0
     eff_cluster1 = b0 + b1
     eff_cluster2 = b0 + b2
@@ -190,7 +193,7 @@ def main():
     print(marginal_effects.to_string(index=False))
     print("\n")
 
-# building the summary
+    # building the summary
     summary = format_summary(
         "Fixed-effects regression (Canton & Year FE) with clustered standard errors",
         tidy_df,

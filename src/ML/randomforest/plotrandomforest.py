@@ -4,7 +4,7 @@ import numpy as np
 from pathlib import Path
 
 def plot_true_vs_pred_rf(y_true, y_pred, title="Random Forest – True vs Predicted"):
-
+    # simple scatter plot for true vs predicted
 
     plt.figure(figsize=(7,7))
     plt.scatter(y_true, y_pred, alpha=0.7, label="Observations")

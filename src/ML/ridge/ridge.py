@@ -16,12 +16,16 @@ from sklearn.metrics import mean_squared_error, r2_score
 # data loading function
 def load_data(path=None):
     if path is None:
+        # default dataset path
         ROOT = Path(__file__).resolve().parents[3]
         path = ROOT / "data" / "databasecsv.csv" 
 
     try:
+        # read csv with ; separator
         df = pd.read_csv(path, sep=";")
+        # clean column names
         df.columns = df.columns.str.strip()
+        # fix cluster column names
         rename_map = {c: c.replace("CLUSTER ", "CLUSTER") for c in df.columns if c.startswith("CLUSTER ")}
         if rename_map:
             df = df.rename(columns=rename_map)
@@ -41,7 +45,7 @@ def prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     df["canton_id"] = df["canton"].astype("category").cat.codes
     df["migration_lag1"] = df.groupby("canton_id")["migration_rate"].shift(1)
 
-
+    # base features for ridge
     base_vars = [ 
         "Z_score_rent",
         "avg_income_zscore",
@@ -52,7 +56,7 @@ def prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         "migration_lag1",
     ]
 
-    # Interactions
+    # Interactions (simple products)
     df["avg_income_zscore_x_Z_score_rent"] = df["avg_income_zscore"] * df["Z_score_rent"]
     df["z-score_unemployment_x_avg_income_zscore"] = df["z-score_unemployment"] * df["avg_income_zscore"]
     df["schockexposure_x_CLUSTER1"] = df["shockexposure_zscore"] * df["CLUSTER1"]
@@ -67,11 +71,13 @@ def prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
     required_cols = ["migration_rate", "canton", "year"] + base_vars + interaction_vars
     
+    # check if required columns exist
     missing = [col for col in required_cols if col not in df.columns]
 
     if missing:
         raise KeyError(f"Missing required columns: {missing}")
 
+    # drop rows with missing required values
     df_model= df.dropna(subset=required_cols).copy()
     print(f"After initial cleaning: {len(df_model)} rows")
 
@@ -103,12 +109,14 @@ def prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 def time_split(df: pd.DataFrame, feature_cols):
     df_sorted = df.sort_values(["year"]).reset_index(drop=True)
     years = df_sorted["year"].unique()
+    # 80/20 split by year
     cut = int(0.8 * len(years)) if len(years) > 1 else 1
 
     train_years = set(years[:cut])
     test_years = set(years[cut:]) if cut < len(years) else set()
 
 
+    # build arrays
     X_train = df_sorted.loc[df_sorted["year"].isin(train_years), feature_cols].apply(pd.to_numeric, errors="coerce").to_numpy()
     y_train = pd.to_numeric(df_sorted.loc[df_sorted["year"].isin(train_years), "migration_rate"], errors="coerce").to_numpy()
     X_test  = df_sorted.loc[df_sorted["year"].isin(test_years),  feature_cols].apply(pd.to_numeric, errors="coerce").to_numpy()
@@ -142,6 +150,7 @@ def run_ridge(X_train, y_train, X_test, y_test, alphas):
     results = []
 
     for alpha in alphas:
+        # fit ridge with this alpha
         model = Ridge(alpha=alpha)
         model.fit(X_inner_train_scaled, y_inner_train)
 
@@ -171,6 +180,7 @@ def run_ridge(X_train, y_train, X_test, y_test, alphas):
     return best_model, best_alpha, best_r2_test, results, scaler
 
 if __name__ == "__main__":
+    # quick run from CLI
     ROOT = Path(__file__).resolve().parents[3]
     DATA_PATH = ROOT / "data" / "databasecsv.csv"
 
@@ -232,4 +242,3 @@ if __name__ == "__main__":
     for f in feature_cols:
         print(f)
     print(coef_table.head(50).to_string())
-

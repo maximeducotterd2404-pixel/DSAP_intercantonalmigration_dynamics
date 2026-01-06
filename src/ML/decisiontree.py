@@ -9,12 +9,16 @@ from sklearn.metrics import accuracy_score
 
 def load_data(path=None):
     if path is None:
+        # get default path when not given
         ROOT = Path(__file__).resolve().parents[2]
         path = ROOT / "data" / "databasecsv.csv"
 
     try:
+        # read csv with ; separator
         df = pd.read_csv(path, sep=";")
+        # clean column names
         df.columns = df.columns.str.strip()
+        # fix cluster column names if they have spaces
         rename_map = {c: c.replace("CLUSTER ", "CLUSTER") for c in df.columns if c.startswith("CLUSTER ")}
         if rename_map:
             df = df.rename(columns=rename_map)
@@ -27,7 +31,7 @@ def load_data(path=None):
         raise RuntimeError(f"Unexpected error loading dataset: {e}")
 
 
-# explicative variables
+# explicative variables (features for the classifier)
 FEATURE_COLS = [
     "log_rent_avg",
     "log_avg_income",
@@ -39,17 +43,17 @@ FEATURE_COLS = [
     "CLUSTER2"
 ]
 
-# preparation of te data
+# preparation of the data
 def prepare_dataset(df):
+    # sort by canton and year to make diffs correct
     df = df.sort_values(["canton", "year"])
 
-# target variable : direction of migration_rate change
+    # target variable: direction of migration_rate change
     df["migration_rate_diff"] = df.groupby("canton")["migration_rate"].diff()
     df = df.dropna(subset=["migration_rate_diff"])
     df["y_cls"] = (df["migration_rate_diff"] > 0).astype(int)
 
-
-#verification of required columns
+    # verification of required columns
     required_cols = ["canton", "year", "migration_rate"] + FEATURE_COLS
     missing = [col for col in required_cols if col not in df.columns]
 
@@ -83,8 +87,9 @@ def prepare_dataset(df):
 
 # decision tree model
 def train_decision_tree(X_train, y_train, max_depth=3):
+    # shallow tree to avoid big overfitting
     model = DecisionTreeClassifier(max_depth=3, random_state=0)
-# training with error handling
+    # training with error handling
     try:
         model.fit(X_train, y_train)
     except ValueError as e:
@@ -94,25 +99,28 @@ def train_decision_tree(X_train, y_train, max_depth=3):
     
     return model
 
-# prediction and evalutation
+# prediction and evaluation
 
 def evaluate_model(model, X_test, y_test):
     """Return accuracy of the decision tree."""
+    # just do predictions and compare
     preds = model.predict(X_test)
     acc = accuracy_score(y_test, preds)
     return acc
 
 def main():
+    # load data
     df = load_data()
     X_train, y_train, X_test, y_test = prepare_dataset(df)
 
+    # train model
     model = train_decision_tree(X_train, y_train)
 
-    # Évaluation
+    # evaluation
     acc = evaluate_model(model, X_test, y_test)
     print(f"Decision Tree Accuracy = {acc:.3f}")
 
-    # Graphical plot
+    # graphical plot
     plt.figure(figsize=(16, 10))
     plot_tree(
         model,

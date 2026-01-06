@@ -11,6 +11,7 @@ def plot_true_vs_pred_rf(y_true, y_pred, title="Random Forest – True vs Predic
     Includes diagonal perfect prediction line.
     """
 
+    # basic scatter
     plt.figure(figsize=(7, 7))
     plt.scatter(y_true, y_pred, alpha=0.7, label="Observations")
 
@@ -33,6 +34,7 @@ def plot_true_vs_pred_rf(y_true, y_pred, title="Random Forest – True vs Predic
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
+    # save plot to results folder
     results_dir = Path(__file__).resolve().parents[3] / "results"
     outfile = results_dir / "ols_true_vs_pred.png"
     plt.savefig(outfile, dpi=300, bbox_inches="tight")

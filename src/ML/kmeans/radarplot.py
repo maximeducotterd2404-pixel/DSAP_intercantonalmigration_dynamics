@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 from datetime import datetime
 
-# used columna and their labels for radar plot
+# used columns and their labels for radar plot
 FEATURE_MAP = [
     ("Z_score_rent",        "Rent"),
     ("avg_income_zscore",   "Income"),
@@ -29,6 +29,7 @@ def _build_profiles(df):
     if "cluster" not in df.columns:
         raise ValueError("Missing column in df: cluster")
 
+    # clean canton codes (strings)
     df["canton"] = df["canton"].astype(str).str.strip()
 
     feature_cols = [col for col, _ in FEATURE_MAP]
@@ -135,9 +136,11 @@ if __name__ == "__main__":
     # Quick CLI entry to produce the radar plot directly.
     from src.ML.kmeans.kmeans import load_data, prepare_matrix, run_kmeans, assign_clusters
 
+    # load and cluster data
     df = load_data()
     df_clean, X = prepare_matrix(df)
     model = run_kmeans(X, k=3, random_state=0)
     df_clustered = assign_clusters(df_clean, model)
 
+    # plot radar
     plot_cluster_radar(df_clustered)

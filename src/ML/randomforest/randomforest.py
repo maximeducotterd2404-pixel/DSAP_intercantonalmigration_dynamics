@@ -15,12 +15,16 @@ from sklearn.metrics import r2_score, root_mean_squared_error
 
 def load_data(path=None):
     if path is None:
+        # default dataset path
         ROOT = Path(__file__).resolve().parents[3]
         path = ROOT / "data" / "databasecsv.csv"
 
     try:
+        # read csv with ; separator
         df = pd.read_csv(path, sep=";")
+        # clean column names
         df.columns = df.columns.str.strip()
+        # fix cluster column names
         rename_map = {c: c.replace("CLUSTER ", "CLUSTER") for c in df.columns if c.startswith("CLUSTER ")}
         if rename_map:
             df = df.rename(columns=rename_map)
@@ -55,6 +59,7 @@ def prepare_dataframe(df: pd.DataFrame):
     FE = pd.get_dummies(df["canton_id"], prefix="FE", drop_first=True)
     df = pd.concat([df, FE], axis=1)
 
+    # keep a small set of features for the RF
     feature_cols = [
         "log_rent_avg",
         "log_avg_income",
@@ -101,6 +106,7 @@ def prepare_dataframe(df: pd.DataFrame):
 
 def time_split(df: pd.DataFrame, feature_cols, target_col):
 
+    # sort by year (time split)
     df = df.sort_values("year").reset_index(drop=True)
 
     years = df["year"].unique()
@@ -124,6 +130,7 @@ def time_split(df: pd.DataFrame, feature_cols, target_col):
 
 def run_random_forest(X_train, y_train, X_test, y_test):
 
+    # build the RF model
     rf = RandomForestRegressor(
     n_estimators=300,
         max_depth=6,
@@ -156,8 +163,10 @@ def run_random_forest(X_train, y_train, X_test, y_test):
 
 
 def get_feature_importance(rf, feature_cols):
+    # take built-in importances from sklearn
     importances = rf.feature_importances_
 
+    # sort highest first
     feat_imp = sorted(
         zip(feature_cols, importances),
         key=lambda x: x[1],
@@ -171,6 +180,7 @@ def get_feature_importance(rf, feature_cols):
 # main
 
 if __name__ == "__main__":
+    # quick run from CLI
     df = load_data()
     df, feature_cols, target = prepare_dataframe(df)
 
@@ -180,6 +190,7 @@ if __name__ == "__main__":
         X_train, y_train, X_test, y_test
     )
 
+    # print results
     print("\n=== RANDOM FOREST RESULTS ===")
     print(f"Train R² : {r2_train:.4f}")
     print(f"Test  R² : {r2:.4f}")

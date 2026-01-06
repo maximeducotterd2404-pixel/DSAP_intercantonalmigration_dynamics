@@ -5,6 +5,7 @@ from pathlib import Path
 
 def plot_true_vs_pred_boost(y_true, y_pred, title="Boosting – True vs Predicted"):
 
+    # simple scatter plot for boosting
     plt.figure(figsize=(7,7))
     plt.scatter(y_true, y_pred, alpha=0.7, label="Observations")
 
@@ -21,6 +22,7 @@ def plot_true_vs_pred_boost(y_true, y_pred, title="Boosting – True vs Predicte
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
+    # save to results folder
     results_dir = Path(__file__).resolve().parents[3] / "results"
     outfile = results_dir / "gradientboosting_true_vs_pred.png"
     plt.savefig(outfile, dpi=300, bbox_inches="tight")

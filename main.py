@@ -14,6 +14,7 @@ from pathlib import Path
 import argparse
 import sys
 
+# local helper modules
 from src import data_loader as dl
 from src import models as mdl
 from src import evaluation as evl
@@ -25,10 +26,12 @@ from src.ML.Gradientboosting import gradientboosting as gb_module
 from src.ML import decisiontree as dt_module
 
 
+# default dataset path
 DATA_DEFAULT = Path(__file__).resolve().parent / "data" / "databasecsv.csv"
 
 
 def run_ols(data_path: Path) -> None:
+    # Use the data_loader facade (wraps existing loader/prep)
     # Use the data_loader facade (wraps existing loader/prep)
     df_model, X_df, y_ser, feature_cols = dl.load_for_ols(data_path)
     X_train, X_test, y_train, y_test = ols_module.time_split(df_model, feature_cols)
@@ -43,6 +46,7 @@ def run_ols(data_path: Path) -> None:
 
 
 def run_ridge(data_path: Path) -> None:
+    # load preprocessed data for ridge
     df_model = dl.load_for_ridge(data_path)
 
     base_vars = [
@@ -62,11 +66,13 @@ def run_ridge(data_path: Path) -> None:
     ]
     feature_cols = base_vars + interaction_vars + [c for c in df_model.columns if c.startswith("canton_")]
 
+    # time split
     X_train, X_test, y_train, y_test = ridge_module.time_split(df_model, feature_cols)
     best_model, best_alpha, best_r2_test, results, scaler = mdl.train_ridge(
         X_train, y_train, X_test, y_test, alphas=[0, 0.0001, 0.001, 0.01, 0.1, 1.0, 10.0]
     )
 
+    # scale train/test with fitted scaler
     X_train_scaled = scaler.transform(X_train)
     X_test_scaled = scaler.transform(X_test)
     y_pred_train = best_model.predict(X_train_scaled)
@@ -88,6 +94,7 @@ def run_ridge(data_path: Path) -> None:
 
 
 def run_randomforest(data_path: Path) -> None:
+    # load and split data
     df, feature_cols, target_col = dl.load_for_randomforest(data_path)
     X_train, X_test, y_train, y_test = rf_module.time_split(df, feature_cols, target_col)
     rf, _, r2_test, rmse, r2_train = mdl.train_randomforest(X_train, y_train, X_test, y_test)
@@ -102,6 +109,7 @@ def run_randomforest(data_path: Path) -> None:
 
 
 def run_gradientboosting(data_path: Path) -> None:
+    # load data and train boosting
     df, feature_cols, target_col = dl.load_for_gradientboosting(data_path)
     X_train, X_test, y_train, y_test = gb_module.time_split(df, feature_cols, target_col)
     model = mdl.train_gradientboosting(X_train, y_train)
@@ -118,6 +126,7 @@ def run_gradientboosting(data_path: Path) -> None:
 
 
 def run_decisiontree(data_path: Path) -> None:
+    # load data for decision tree classifier
     df = dl.load_for_decisiontree(data_path)
     X_train, y_train, X_test, y_test = dt_module.prepare_dataset(df)
     model = mdl.train_decisiontree(X_train, y_train)
@@ -129,6 +138,7 @@ def run_decisiontree(data_path: Path) -> None:
 
 
 def parse_args() -> argparse.Namespace:
+    # CLI arguments
     parser = argparse.ArgumentParser(
         description="Run migration models from a single entry point."
     )
@@ -148,6 +158,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    # entry point for the script
     args = parse_args()
     data_path = args.data
 
@@ -155,6 +166,7 @@ def main() -> int:
         print(f"Dataset not found at {data_path}", file=sys.stderr)
         return 1
 
+    # map model name to function
     runners = {
         "ols": run_ols,
         "ridge": run_ridge,
@@ -163,6 +175,7 @@ def main() -> int:
         "decisiontree": run_decisiontree,
     }
 
+    # choose models to run
     to_run = list(runners.keys()) if args.model == "all" else [args.model]
 
     for name in to_run:
@@ -175,4 +188,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    # run main when file is executed directly
     sys.exit(main())
