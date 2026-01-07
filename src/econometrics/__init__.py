@@ -1,1 +1,0 @@
-"""Econometrics subpackage init (simple)."""

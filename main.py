@@ -19,6 +19,7 @@ import sys
 from src import data_loader as dl
 from src import models as mdl
 from src import evaluation as evl
+
 # We still import the underlying modules for time-based split helpers and feature utilities
 from src.ML.ols import ols as ols_module
 from src.ML.ridge import ridge as ridge_module
@@ -31,15 +32,19 @@ from src.ML.kmeans import kmeans as km_module
 # default dataset path
 DATA_DEFAULT = Path(__file__).resolve().parent / "data" / "databasecsv.csv"
 
+
 def configure_matplotlib(non_interactive: bool) -> None:
     if not non_interactive:
         return
 
     import os
+
     os.environ.setdefault("MPLBACKEND", "Agg")
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+
     plt.ioff()
     plt.show = lambda *args, **kwargs: None
 
@@ -51,6 +56,7 @@ def run_ols(data_path: Path) -> None:
     X_train, X_test, y_train, y_test = ols_module.time_split(df_model, feature_cols)
     model, y_pred, mse, r2, _, _ = mdl.train_ols(X_train, y_train, X_test, y_test)
     from sklearn.metrics import r2_score
+
     y_pred_train = model.predict(X_train)
     r2_train = r2_score(y_train, y_pred_train)
 
@@ -80,12 +86,20 @@ def run_ridge(data_path: Path) -> None:
         "schockexposure_x_CLUSTER1",
         "schockexposure_x_CLUSTER2",
     ]
-    feature_cols = base_vars + interaction_vars + [c for c in df_model.columns if c.startswith("canton_")]
+    feature_cols = (
+        base_vars
+        + interaction_vars
+        + [c for c in df_model.columns if c.startswith("canton_")]
+    )
 
     # time split
     X_train, X_test, y_train, y_test = ridge_module.time_split(df_model, feature_cols)
     best_model, best_alpha, best_r2_test, results, scaler = mdl.train_ridge(
-        X_train, y_train, X_test, y_test, alphas=[0, 0.0001, 0.001, 0.01, 0.1, 1.0, 10.0]
+        X_train,
+        y_train,
+        X_test,
+        y_test,
+        alphas=[0, 0.0001, 0.001, 0.01, 0.1, 1.0, 10.0],
     )
 
     # scale train/test with fitted scaler
@@ -94,7 +108,10 @@ def run_ridge(data_path: Path) -> None:
     y_pred_train = best_model.predict(X_train_scaled)
     y_pred_test = best_model.predict(X_test_scaled)
 
-    from sklearn.metrics import r2_score, mean_squared_error  # local import to avoid polluting namespace
+    from sklearn.metrics import (
+        r2_score,
+        mean_squared_error,
+    )  # local import to avoid polluting namespace
 
     r2_train = r2_score(y_train, y_pred_train)
     mse_test = mean_squared_error(y_test, y_pred_test)
@@ -105,7 +122,9 @@ def run_ridge(data_path: Path) -> None:
 
     print("=== Ridge Regression ===")
     print(f"Best alpha (selected on validation): {best_alpha}")
-    print(f"Train R2: {r2_train:.4f} | Val R2: {r2_val:.4f} | Test R2: {best_r2_test:.4f} | Test MSE: {mse_test:.4f}")
+    print(
+        f"Train R2: {r2_train:.4f} | Val R2: {r2_val:.4f} | Test R2: {best_r2_test:.4f} | Test MSE: {mse_test:.4f}"
+    )
     print(f"Train rows: {len(y_train)} | Test rows: {len(y_test)}")
     plot_path = evl.plot_ridge_true_vs_pred(y_test, y_pred_test)
     print(f"Saved plot: {plot_path}")
@@ -114,13 +133,19 @@ def run_ridge(data_path: Path) -> None:
 def run_randomforest(data_path: Path) -> None:
     # load and split data
     df, feature_cols, target_col = dl.load_for_randomforest(data_path)
-    X_train, X_test, y_train, y_test = rf_module.time_split(df, feature_cols, target_col)
-    rf, y_pred, r2_test, rmse, r2_train = mdl.train_randomforest(X_train, y_train, X_test, y_test)
+    X_train, X_test, y_train, y_test = rf_module.time_split(
+        df, feature_cols, target_col
+    )
+    rf, y_pred, r2_test, rmse, r2_train = mdl.train_randomforest(
+        X_train, y_train, X_test, y_test
+    )
     feat_imp = rf_module.get_feature_importance(rf, feature_cols)[:5]
     metrics = evl.eval_randomforest(rf, X_train, y_train, X_test, y_test)
 
     print("=== Random Forest ===")
-    print(f"Train R2: {metrics['r2_train']:.4f} | Test R2: {metrics['r2_test']:.4f} | Test RMSE: {metrics['rmse_test']:.4f}")
+    print(
+        f"Train R2: {metrics['r2_train']:.4f} | Test R2: {metrics['r2_test']:.4f} | Test RMSE: {metrics['rmse_test']:.4f}"
+    )
     print("Top feature importances (name, importance):")
     for name, score in feat_imp:
         print(f"  {name:25s} {score:.4f}")
@@ -131,7 +156,9 @@ def run_randomforest(data_path: Path) -> None:
 def run_gradientboosting(data_path: Path) -> None:
     # load data and train boosting
     df, feature_cols, target_col = dl.load_for_gradientboosting(data_path)
-    X_train, X_test, y_train, y_test = gb_module.time_split(df, feature_cols, target_col)
+    X_train, X_test, y_train, y_test = gb_module.time_split(
+        df, feature_cols, target_col
+    )
     model = mdl.train_gradientboosting(X_train, y_train)
     metrics = evl.eval_gradientboosting(model, X_train, y_train, X_test, y_test)
 
@@ -139,7 +166,9 @@ def run_gradientboosting(data_path: Path) -> None:
     sorted_imp = sorted(importance.items(), key=lambda x: -x[1])[:5]
 
     print("=== Gradient Boosting ===")
-    print(f"Train R2: {metrics['r2_train']:.4f} | Test R2: {metrics['r2_test']:.4f} | Test RMSE: {metrics['rmse_test']:.4f}")
+    print(
+        f"Train R2: {metrics['r2_train']:.4f} | Test R2: {metrics['r2_test']:.4f} | Test RMSE: {metrics['rmse_test']:.4f}"
+    )
     print("Top feature importances (name, importance):")
     for name, score in sorted_imp:
         print(f"  {name:25s} {score:.4f}")
@@ -182,7 +211,15 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--model",
-        choices=["ols", "ridge", "randomforest", "gradientboosting", "decisiontree", "kmeans", "all"],
+        choices=[
+            "ols",
+            "ridge",
+            "randomforest",
+            "gradientboosting",
+            "decisiontree",
+            "kmeans",
+            "all",
+        ],
         default="ols",
         help="Which model to run (use 'all' to run every model in sequence).",
     )

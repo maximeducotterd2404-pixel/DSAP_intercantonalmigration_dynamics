@@ -1,1 +1,1 @@
-"""Ridge subpackage init (kept minimal)."""
+"""Namespace for ridge regression utilities."""

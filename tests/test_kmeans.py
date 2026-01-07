@@ -10,9 +10,11 @@ from src.ML.kmeans.kmeans import (
     prepare_matrix,
     run_kmeans,
     assign_clusters,
-    FEATURE_COLS
+    FEATURE_COLS,
 )
+
 # Test kmeans.py
+
 
 def test_load_data_success(tmp_path):
     """load_data should load a valid CSV file."""
@@ -35,14 +37,16 @@ def test_load_data_missing_file():
 # test matrix preparation
 def test_prepare_matrix_valid():
     """prepare_matrix should return df_clean and X as a numpy matrix."""
-    df = pd.DataFrame({
-        "Z_score_rent": [0.1, 0.2],
-        "avg_income_zscore": [1.0, 0.5],
-        "z-score_unemployment": [-0.1, 0.0],
-        "Z-score-ownrrate": [0.3, 0.4],
-        "Z-score-debt": [1.2, 1.0],
-        "shockexposure_zscore": [0.7, 0.8]
-    })
+    df = pd.DataFrame(
+        {
+            "Z_score_rent": [0.1, 0.2],
+            "avg_income_zscore": [1.0, 0.5],
+            "z-score_unemployment": [-0.1, 0.0],
+            "Z-score-ownrrate": [0.3, 0.4],
+            "Z-score-debt": [1.2, 1.0],
+            "shockexposure_zscore": [0.7, 0.8],
+        }
+    )
 
     df_clean, X = prepare_matrix(df, FEATURE_COLS)
 
@@ -61,6 +65,7 @@ def test_prepare_matrix_missing_columns():
 
 # test run_kmeans
 
+
 def test_run_kmeans_basic():
     """run_kmeans should fit a model with k clusters."""
     # simple dataset
@@ -74,6 +79,7 @@ def test_run_kmeans_basic():
 
 
 # test assign_cluster
+
 
 def test_assign_clusters():
     """assign_clusters should add a cluster column."""

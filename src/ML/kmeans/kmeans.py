@@ -4,27 +4,28 @@ from sklearn.cluster import KMeans
 from pathlib import Path
 from .radarplot import plot_cluster_radar
 
-# configuration of features to use
+# Use standardized variables to cluster on structural canton profiles.
 FEATURE_COLS = [
     "Z_score_rent",
     "avg_income_zscore",
     "z-score_unemployment",
     "Z-score-ownrrate",
     "Z-score-debt",
-    "shockexposure_zscore"
+    "shockexposure_zscore",
 ]
 
-# data loading function
+
+# Centralize loading so clustering uses the same cleaned inputs.
 def load_data(path=None):
     if path is None:
-        # default dataset path
+        # Use a repo-relative path so CLI runs are reproducible.
         ROOT = Path(__file__).resolve().parents[3]
         path = ROOT / "data" / "databasecsv.csv"
 
     try:
-        # read csv with ; separator
+        # Raw data uses ";" as a delimiter, so avoid mis-parsing.
         df = pd.read_csv(path, sep=";")
-        # clean column names
+        # Trim whitespace to keep column name matching stable.
         df.columns = df.columns.str.strip()
         return df
     except FileNotFoundError:
@@ -34,22 +35,24 @@ def load_data(path=None):
     except Exception as e:
         raise RuntimeError(f"Unexpected error loading dataset: {e}")
 
-# matrix preparation
+
+# Prepare the matrix so clustering reflects structural profiles.
+
 
 def prepare_matrix(df, feature_cols=FEATURE_COLS):
-    # check needed columns
+    # Fail fast if required features are missing.
     missing = [c for c in feature_cols if c not in df.columns]
     if missing:
         raise KeyError(f"Missing required columns: {missing}")
 
-    # drop rows with missing values
+    # Avoid NaNs so K-means distances are well-defined.
     if "canton" in df.columns:
         df_clean = df.dropna(subset=feature_cols + ["canton"]).copy()
         df_clean["canton"] = df_clean["canton"].astype(str).str.strip()
     else:
         df_clean = df.dropna(subset=feature_cols).copy()
 
-    # force numeric for features
+    # Ensure numeric types before clustering.
     for col in feature_cols:
         df_clean[col] = pd.to_numeric(df_clean[col], errors="coerce")
 
@@ -57,7 +60,7 @@ def prepare_matrix(df, feature_cols=FEATURE_COLS):
         raise ValueError("NaN detected after conversion to numeric.")
 
     if "canton" in df_clean.columns:
-        # Long-run canton averages: one row per canton for clustering
+        # Use canton averages to capture structural differences over time.
         df_canton = df_clean.groupby("canton", as_index=False)[feature_cols].mean()
         X = df_canton[feature_cols].to_numpy()
         return df_canton, X
@@ -66,27 +69,28 @@ def prepare_matrix(df, feature_cols=FEATURE_COLS):
     return df_clean, X
 
 
-# run kmeans
-def run_kmeans(X, k=3, random_state=0):
-    # basic sklearn KMeans
+# Run K-means to summarize cantonal profiles.
+def run_kmeans(X, k=4, random_state=0):
+    # Fixed seed and n_init improve stability for small samples.
     model = KMeans(n_clusters=k, random_state=random_state, n_init=10)
     model.fit(X)
     return model
 
 
 def assign_clusters(df_clean, model):
-    # assign model labels to df
+    # Attach cluster labels for downstream interpretation and interactions.
     df_out = df_clean.copy()
     df_out["cluster"] = model.labels_
     return df_out
 
+
 def main():
-    # run everything end to end
+    # End-to-end run for reproducible cluster assignment.
     df = load_data()
     df_clean, X = prepare_matrix(df)
-    model = run_kmeans(X, k=3)
+    model = run_kmeans(X, k=4)
     df_clustered = assign_clusters(df_clean, model)
-    
+
     print("\n=== TOTAL INERTIA ===")
     print(model.inertia_)
 
@@ -102,7 +106,7 @@ def main():
     canton_main = df_clustered[["canton", "cluster"]].sort_values("cluster")
     print(canton_main)
 
-    # === NEW : PLOT RADAR ===
+    # Plot a radar chart to interpret cluster profiles.
     print("\n=== RADAR PLOT ===")
     plot_cluster_radar(df_clustered)
 

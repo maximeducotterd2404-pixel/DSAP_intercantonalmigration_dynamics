@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Sklearn Ridge regression for migration_rate
-Pattern: split -> scale -> model -> fit -> predict -> evaluate
+Sklearn Ridge regression for migration_rate.
+Uses standardized predictors to stabilize shrinkage on correlated features.
 """
 
 from pathlib import Path
@@ -13,20 +13,25 @@ from sklearn.linear_model import Ridge
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, r2_score
 
-# data loading function
+
+# Centralize loading so preprocessing is consistent across models.
 def load_data(path=None):
     if path is None:
-        # default dataset path
+        # Use a repo-relative path so CLI runs are reproducible.
         ROOT = Path(__file__).resolve().parents[3]
-        path = ROOT / "data" / "databasecsv.csv" 
+        path = ROOT / "data" / "databasecsv.csv"
 
     try:
-        # read csv with ; separator
+        # Raw data uses ";" as a delimiter, so avoid mis-parsing.
         df = pd.read_csv(path, sep=";")
-        # clean column names
+        # Trim whitespace to keep column name matching stable.
         df.columns = df.columns.str.strip()
-        # fix cluster column names
-        rename_map = {c: c.replace("CLUSTER ", "CLUSTER") for c in df.columns if c.startswith("CLUSTER ")}
+        # Normalize cluster labels to keep feature names consistent.
+        rename_map = {
+            c: c.replace("CLUSTER ", "CLUSTER")
+            for c in df.columns
+            if c.startswith("CLUSTER ")
+        }
         if rename_map:
             df = df.rename(columns=rename_map)
         return df
@@ -38,15 +43,15 @@ def load_data(path=None):
         raise RuntimeError(f"Unexpected error loading dataset: {e}")
 
 
-# Base variables
+# Feature prep aligned with the report's standardized variables.
 def prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
-    # Encode canton as categorical codes
+    # Encode cantons to compute within-canton lags reliably.
     df["canton_id"] = df["canton"].astype("category").cat.codes
     df["migration_lag1"] = df.groupby("canton_id")["migration_rate"].shift(1)
 
-    # base features for ridge
-    base_vars = [ 
+    # Standardized predictors keep the ridge penalty scale-invariant.
+    base_vars = [
         "Z_score_rent",
         "avg_income_zscore",
         "z-score_unemployment",
@@ -56,9 +61,13 @@ def prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         "migration_lag1",
     ]
 
-    # Interactions (simple products)
-    df["avg_income_zscore_x_Z_score_rent"] = df["avg_income_zscore"] * df["Z_score_rent"]
-    df["z-score_unemployment_x_avg_income_zscore"] = df["z-score_unemployment"] * df["avg_income_zscore"]
+    # Interactions capture trade-offs and heterogeneous shock effects.
+    df["avg_income_zscore_x_Z_score_rent"] = (
+        df["avg_income_zscore"] * df["Z_score_rent"]
+    )
+    df["z-score_unemployment_x_avg_income_zscore"] = (
+        df["z-score_unemployment"] * df["avg_income_zscore"]
+    )
     df["schockexposure_x_CLUSTER1"] = df["shockexposure_zscore"] * df["CLUSTER1"]
     df["schockexposure_x_CLUSTER2"] = df["shockexposure_zscore"] * df["CLUSTER2"]
 
@@ -70,70 +79,98 @@ def prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     ]
 
     required_cols = ["migration_rate", "canton", "year"] + base_vars + interaction_vars
-    
-    # check if required columns exist
+
+    # Fail fast if upstream preprocessing changed expected columns.
     missing = [col for col in required_cols if col not in df.columns]
 
     if missing:
         raise KeyError(f"Missing required columns: {missing}")
 
-    # drop rows with missing required values
-    df_model= df.dropna(subset=required_cols).copy()
+    # Keep a consistent sample across features and target.
+    df_model = df.dropna(subset=required_cols).copy()
     print(f"After initial cleaning: {len(df_model)} rows")
 
-    # Canton dummies 
+    # Fixed effects absorb time-invariant cantonal differences.
     df_model = pd.get_dummies(df_model, columns=["canton"], drop_first=True)
 
-    # Ensure year is numeric for chronological split
+    # Ensure chronological splitting works as intended.
     df_model["year"] = pd.to_numeric(df_model["year"], errors="coerce")
 
-    # Final feature list
-    feature_cols = base_vars + interaction_vars + [c for c in df_model.columns if c.startswith("canton_")]
+    # Assemble the full design matrix.
+    feature_cols = (
+        base_vars
+        + interaction_vars
+        + [c for c in df_model.columns if c.startswith("canton_")]
+    )
 
-    # safe numeric conversion
+    # Coerce types to avoid silent object dtypes.
     try:
-       df_model[feature_cols] = df_model[feature_cols].apply(pd.to_numeric, errors="coerce")
-       df_model["migration_rate"] = pd.to_numeric(df_model["migration_rate"], errors="coerce")
+        df_model[feature_cols] = df_model[feature_cols].apply(
+            pd.to_numeric, errors="coerce"
+        )
+        df_model["migration_rate"] = pd.to_numeric(
+            df_model["migration_rate"], errors="coerce"
+        )
 
     except Exception as e:
         raise ValueError(f"Failed to convert features to numeric: {e}")
 
-    # NaN check after coercion
-    if df_model[feature_cols].isna().any().any() or df_model["migration_rate"].isna().any():
+    # Avoid hidden NaNs that would bias estimation.
+    if (
+        df_model[feature_cols].isna().any().any()
+        or df_model["migration_rate"].isna().any()
+    ):
         raise ValueError(
             "Some features or target contain non-numeric or missing values "
         )
     return df_model
 
-# times based train-test split
+
+# Time split to mimic forecasting and prevent leakage.
 def time_split(df: pd.DataFrame, feature_cols):
     df_sorted = df.sort_values(["year"]).reset_index(drop=True)
     years = df_sorted["year"].unique()
-    # 80/20 split by year
+    # Keep a simple 80/20 split for comparability across models.
     cut = int(0.8 * len(years)) if len(years) > 1 else 1
 
     train_years = set(years[:cut])
     test_years = set(years[cut:]) if cut < len(years) else set()
 
-
-    # build arrays
-    X_train = df_sorted.loc[df_sorted["year"].isin(train_years), feature_cols].apply(pd.to_numeric, errors="coerce").to_numpy()
-    y_train = pd.to_numeric(df_sorted.loc[df_sorted["year"].isin(train_years), "migration_rate"], errors="coerce").to_numpy()
-    X_test  = df_sorted.loc[df_sorted["year"].isin(test_years),  feature_cols].apply(pd.to_numeric, errors="coerce").to_numpy()
-    y_test  = pd.to_numeric(df_sorted.loc[df_sorted["year"].isin(test_years),  "migration_rate"], errors="coerce").to_numpy()
+    # Build arrays after isolating train/test years.
+    X_train = (
+        df_sorted.loc[df_sorted["year"].isin(train_years), feature_cols]
+        .apply(pd.to_numeric, errors="coerce")
+        .to_numpy()
+    )
+    y_train = pd.to_numeric(
+        df_sorted.loc[df_sorted["year"].isin(train_years), "migration_rate"],
+        errors="coerce",
+    ).to_numpy()
+    X_test = (
+        df_sorted.loc[df_sorted["year"].isin(test_years), feature_cols]
+        .apply(pd.to_numeric, errors="coerce")
+        .to_numpy()
+    )
+    y_test = pd.to_numeric(
+        df_sorted.loc[df_sorted["year"].isin(test_years), "migration_rate"],
+        errors="coerce",
+    ).to_numpy()
 
     return X_train, X_test, y_train, y_test
 
-#standardized scaling
+
+# Standardize features so ridge shrinkage treats predictors equally.
 def run_ridge(X_train, y_train, X_test, y_test, alphas):
 
     if not alphas:
         raise ValueError("alphas must contain at least one value.")
 
-    # ---- Inner train/validation split (keeps chronological order) ----
+    # ---- Inner split to tune alpha without leakage ----
     n_train = len(y_train)
     if n_train < 3:
-        raise ValueError("Not enough training samples to run Ridge with validation split.")
+        raise ValueError(
+            "Not enough training samples to run Ridge with validation split."
+        )
 
     cut = int(0.8 * n_train)
     cut = max(1, min(cut, n_train - 1))  # ensure at least 1 obs in train and val
@@ -141,7 +178,7 @@ def run_ridge(X_train, y_train, X_test, y_test, alphas):
     X_inner_train, y_inner_train = X_train[:cut], y_train[:cut]
     X_val, y_val = X_train[cut:], y_train[cut:]
 
-    # Fit scaler only on inner-train (prevents leakage into validation)
+    # Fit scaler on inner-train only to avoid validation leakage.
     scaler_inner = StandardScaler()
     X_inner_train_scaled = scaler_inner.fit_transform(X_inner_train)
     X_val_scaled = scaler_inner.transform(X_val)
@@ -149,11 +186,11 @@ def run_ridge(X_train, y_train, X_test, y_test, alphas):
     best_alpha = None
     best_score = -np.inf
 
-    # Keep results for reporting: (alpha, val_mse, train_r2, val_r2)
+    # Store validation results for transparent selection.
     results = []
 
     for alpha in alphas:
-        # fit ridge with this alpha
+        # Evaluate each alpha on the held-out validation segment.
         model = Ridge(alpha=alpha)
         model.fit(X_inner_train_scaled, y_inner_train)
 
@@ -173,7 +210,7 @@ def run_ridge(X_train, y_train, X_test, y_test, alphas):
             best_score = score
             best_alpha = alpha
 
-    # ---- Refit on full training set with best alpha, then evaluate once on test ----
+    # ---- Refit on full training set, then evaluate once on test ----
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
@@ -185,8 +222,9 @@ def run_ridge(X_train, y_train, X_test, y_test, alphas):
 
     return best_model, best_alpha, best_r2_test, results, scaler
 
+
 if __name__ == "__main__":
-    # quick run from CLI
+    # One-command run for reproducible ridge baselines.
     ROOT = Path(__file__).resolve().parents[3]
     DATA_PATH = ROOT / "data" / "databasecsv.csv"
 
@@ -216,32 +254,34 @@ if __name__ == "__main__":
     X_train, X_test, y_train, y_test = time_split(df, feature_cols)
 
     best_model, best_alpha, best_r2_test, results, scaler = run_ridge(
-    X_train, y_train, X_test, y_test,
-    alphas=[0, 0.0001, 0.001, 0.01, 0.1, 1.0, 10.0]
-)
+        X_train,
+        y_train,
+        X_test,
+        y_test,
+        alphas=[0, 0.0001, 0.001, 0.01, 0.1, 1.0, 10.0],
+    )
 
-    # --- Recompute train/test predictions for the best model ---
+    # Compute train/test metrics for reporting.
     X_train_scaled = scaler.transform(X_train)
-    X_test_scaled  = scaler.transform(X_test)
+    X_test_scaled = scaler.transform(X_test)
 
     y_pred_train = best_model.predict(X_train_scaled)
-    y_pred_test  = best_model.predict(X_test_scaled)
+    y_pred_test = best_model.predict(X_test_scaled)
 
     r2_train_best = r2_score(y_train, y_pred_train)
-    r2_test_best  = r2_score(y_test, y_pred_test)
+    r2_test_best = r2_score(y_test, y_pred_test)
 
     print(f"\n=== BEST MODEL PERFORMANCE ===")
     print(f"Best λ: {best_alpha}")
     print(f"Train R²: {r2_train_best:.4f}")
     print(f"Test  R²: {r2_test_best:.4f}")
-    # ---- Display Ridge coefficients ----
+    # Show coefficients for interpretability.
     print("\n=== RIDGE COEFFICIENTS (best model) ===")
 
     coefs = best_model.coef_
-    coef_table = pd.DataFrame({
-        "feature": feature_cols,
-        "coef": coefs
-    }).sort_values("coef", key=abs, ascending=False)
+    coef_table = pd.DataFrame({"feature": feature_cols, "coef": coefs}).sort_values(
+        "coef", key=abs, ascending=False
+    )
 
     print(coef_table.to_string(index=False))
     print("Feature columns:")

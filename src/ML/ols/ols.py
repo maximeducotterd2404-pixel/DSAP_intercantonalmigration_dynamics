@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Sklearn OLS baseline for migration_rate
-Pattern: split -> model -> fit -> predict -> evaluate
+Sklearn OLS baseline for migration_rate.
+Kept intentionally simple to provide an interpretable benchmark.
 """
 
 from pathlib import Path
@@ -12,20 +12,25 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
 
-# data loading function (just read the CSV and clean columns)
+
+# Centralize loading so all models start from the same raw inputs.
 def load_data(path=None):
     if path is None:
-        # find project root from this file
+        # Use a repo-relative path so CLI runs are reproducible.
         ROOT = Path(__file__).resolve().parents[3]
         path = ROOT / "data" / "databasecsv.csv"
 
     try:
-        # CSV uses ";" separator
+        # Raw data uses ";" as a delimiter, so avoid mis-parsing.
         df = pd.read_csv(path, sep=";")
-        # sometimes columns have extra spaces
+        # Trim whitespace to keep column name matching stable.
         df.columns = df.columns.str.strip()
-        # dataset can have "CLUSTER 1" etc, rename to "CLUSTER1"
-        rename_map = {c: c.replace("CLUSTER ", "CLUSTER") for c in df.columns if c.startswith("CLUSTER ")}
+        # Normalize cluster labels to keep feature names consistent.
+        rename_map = {
+            c: c.replace("CLUSTER ", "CLUSTER")
+            for c in df.columns
+            if c.startswith("CLUSTER ")
+        }
         if rename_map:
             df = df.rename(columns=rename_map)
         return df
@@ -37,15 +42,15 @@ def load_data(path=None):
         raise RuntimeError(f"Unexpected error loading dataset: {e}")
 
 
-# Variables choice / feature prep
+# Feature prep aligned with the report specification.
 def prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
-    # Encode canton as numeric IDs so we can use groupby/lag
+    # Encode cantons to compute within-canton lags reliably.
     df["canton_id"] = df["canton"].astype("category").cat.codes
-    # lag the target by canton (one-year lag)
-    df["migration_lag1"] = df.groupby("canton_id")["migration_rate"].shift(1)   
+    # Lagged migration captures persistence in flows.
+    df["migration_lag1"] = df.groupby("canton_id")["migration_rate"].shift(1)
 
-    # base features for OLS
+    # Baseline predictors mirror core housing, labor, and shock drivers.
     base_vars = [
         "log_rent_avg",
         "log_avg_income",
@@ -55,13 +60,18 @@ def prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
         "CLUSTER2",
         "migration_lag1",
     ]
-    # check required columns before interactions (avoid crashes later)
+    # Fail fast if upstream preprocessing changed expected columns.
     required_before_interactions = [
-        "migration_rate", "canton", "year",
-        "log_rent_avg", "log_avg_income",
-        "log_unemployment", "log_schockexposure",
-        "CLUSTER1", "CLUSTER2"
-    ]   
+        "migration_rate",
+        "canton",
+        "year",
+        "log_rent_avg",
+        "log_avg_income",
+        "log_unemployment",
+        "log_schockexposure",
+        "CLUSTER1",
+        "CLUSTER2",
+    ]
 
     missing = [c for c in required_before_interactions if c not in df.columns]
     if missing:
@@ -70,9 +80,11 @@ def prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
             f"Columns available: {list(df.columns)}"
         )
 
-    # Interaction terms (simple products)
+    # Interactions allow heterogeneous effects and trade-offs to enter linearly.
     df["log_avg_income_x_log_rent_avg"] = df["log_avg_income"] * df["log_rent_avg"]
-    df["log_unemployment_rate_x_log_avg_income"] = df["log_unemployment"] * df["log_avg_income"]
+    df["log_unemployment_rate_x_log_avg_income"] = (
+        df["log_unemployment"] * df["log_avg_income"]
+    )
     df["log_schockexposure_x_CLUSTER1"] = df["log_schockexposure"] * df["CLUSTER1"]
     df["log_schockexposure_x_CLUSTER2"] = df["log_schockexposure"] * df["CLUSTER2"]
 
@@ -85,7 +97,7 @@ def prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
     required_cols = ["migration_rate", "canton", "year"] + base_vars + interaction_vars
 
-    # check required columns after interactions
+    # Guard against missing derived features before modeling.
     missing_after = [c for c in required_cols if c not in df.columns]
     if missing_after:
         raise KeyError(
@@ -93,35 +105,41 @@ def prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
             f"Columns available: {list(df.columns)}"
         )
 
-    # drop rows with missing required values
+    # Keep a consistent sample across all features and the target.
     df_model = df.dropna(subset=required_cols).copy()
     print(f"After initial cleaning: {len(df_model)} rows")
 
-    # Dummies for canton fixed effects
+    # Fixed effects absorb time-invariant cantonal differences.
     df_model = pd.get_dummies(df_model, columns=["canton"], drop_first=True)
 
-    # Ensure "year" is numeric for the time split
+    # Ensure chronological splitting works as intended.
     df_model["year"] = pd.to_numeric(df_model["year"], errors="coerce")
 
-    # Final feature list (base + interactions + dummies)
-    feature_cols = base_vars + interaction_vars + [c for c in df_model.columns if c.startswith("canton_")]
+    # Assemble the final design matrix with heterogeneity controls.
+    feature_cols = (
+        base_vars
+        + interaction_vars
+        + [c for c in df_model.columns if c.startswith("canton_")]
+    )
 
-    # numeric conversion with error handling
+    # Coerce types to avoid silent object dtypes.
     try:
         X_df = df_model[feature_cols].apply(pd.to_numeric, errors="coerce")
         y_ser = pd.to_numeric(df_model["migration_rate"], errors="coerce")
     except Exception as e:
         raise ValueError(f"Failed to convert features to numeric: {e}")
 
-    # detect NaNs after conversion
+    # Avoid hidden NaNs that would bias estimation.
     if X_df.isna().any().any() or y_ser.isna().any():
         raise ValueError(
             "NaN values detected after numeric conversion. "
             "Check dataset or preprocessing."
         )
 
-    # Drop invalid lines if year is missing too
-    mask_valid = (~X_df.isna().any(axis=1)) & (~y_ser.isna()) & (~df_model["year"].isna())
+    # Exclude rows with missing years to preserve the time split.
+    mask_valid = (
+        (~X_df.isna().any(axis=1)) & (~y_ser.isna()) & (~df_model["year"].isna())
+    )
     before = len(df_model)
     X_df = X_df.loc[mask_valid]
     y_ser = y_ser.loc[mask_valid]
@@ -131,74 +149,99 @@ def prepare_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     print(f"Rows kept after numeric coercion: {after} (dropped {before-after})")
     return df_model, X_df, y_ser, feature_cols
 
-# temporal train-test split based on years (no leakage)
+
+# Time split to mimic forecasting and prevent leakage.
 def time_split(df: pd.DataFrame, feature_cols):
     df_sorted = df.sort_values(["year"]).reset_index(drop=True)
     years = df_sorted["year"].unique()
-    # 80/20 split by time
+    # Keep a simple 80/20 split for comparability across models.
     cut = int(0.8 * len(years)) if len(years) > 1 else 1
 
     train_years = set(years[:cut])
     test_years = set(years[cut:]) if cut < len(years) else set()
 
-    # build X/y arrays
-    X_train = df_sorted.loc[df_sorted["year"].isin(train_years), feature_cols].apply(pd.to_numeric, errors="coerce").to_numpy()
-    y_train = pd.to_numeric(df_sorted.loc[df_sorted["year"].isin(train_years), "migration_rate"], errors="coerce").to_numpy()
-    X_test  = df_sorted.loc[df_sorted["year"].isin(test_years),  feature_cols].apply(pd.to_numeric, errors="coerce").to_numpy()
-    y_test  = pd.to_numeric(df_sorted.loc[df_sorted["year"].isin(test_years),  "migration_rate"], errors="coerce").to_numpy()
+    # Build arrays after isolating train/test years.
+    X_train = (
+        df_sorted.loc[df_sorted["year"].isin(train_years), feature_cols]
+        .apply(pd.to_numeric, errors="coerce")
+        .to_numpy()
+    )
+    y_train = pd.to_numeric(
+        df_sorted.loc[df_sorted["year"].isin(train_years), "migration_rate"],
+        errors="coerce",
+    ).to_numpy()
+    X_test = (
+        df_sorted.loc[df_sorted["year"].isin(test_years), feature_cols]
+        .apply(pd.to_numeric, errors="coerce")
+        .to_numpy()
+    )
+    y_test = pd.to_numeric(
+        df_sorted.loc[df_sorted["year"].isin(test_years), "migration_rate"],
+        errors="coerce",
+    ).to_numpy()
 
-    # quick shape check
-    print("Split shapes ->",
-        "X_train", X_train.shape, "X_test", X_test.shape,
-        "y_train", y_train.shape, "y_test", y_test.shape)
-    
+    # Quick sanity check to catch empty splits or shape mismatches.
+    print(
+        "Split shapes ->",
+        "X_train",
+        X_train.shape,
+        "X_test",
+        X_test.shape,
+        "y_train",
+        y_train.shape,
+        "y_test",
+        y_test.shape,
+    )
+
     return X_train, X_test, y_train, y_test
 
-# model creation + evaluation
+
+# Model fitting and evaluation for the baseline.
 def run_ols(X_train, y_train, X_test, y_test):
 
     model = LinearRegression()
 
-    # training the model with error handling
+    # Fit once to keep the baseline comparable.
     try:
         model.fit(X_train, y_train)
     except Exception as e:
         raise RuntimeError(f"LinearRegression training failed: {e}")
 
-    # prediction
+    # Predict on held-out years for out-of-sample evaluation.
     try:
         y_pred = model.predict(X_test)
     except Exception as e:
-            raise RuntimeError(f"Prediction failed: {e}")
-    
-    # coefficients
+        raise RuntimeError(f"Prediction failed: {e}")
+
+    # Keep coefficients for interpretation alongside nonlinear models.
     coefs = model.coef_
     intercept = model.intercept_
 
-    # evaluation metrics
+    # Standard metrics for comparison across models.
     mse = mean_squared_error(y_test, y_pred)
     r2 = r2_score(y_test, y_pred)
 
     return model, y_pred, mse, r2, coefs, intercept
 
+
 if __name__ == "__main__":
-    # basic CLI run for quick check
+    # One-command run for reproducible baselines.
     ROOT = Path(__file__).resolve().parents[3]
     DATA_PATH = ROOT / "data" / "databasecsv.csv"
 
-    # 1. load
+    # Load once from the shared dataset.
     df = load_data()
 
-    # 2. prepare
+    # Apply feature engineering consistent with the report.
     df_model, X_df, y_ser, feature_cols = prepare_dataframe(df)
 
-    # 3. time split
+    # Split by year to preserve temporal ordering.
     X_train, X_test, y_train, y_test = time_split(df_model, feature_cols)
 
-    # 4. OLS
+    # Fit the interpretable linear benchmark.
     model, y_pred, mse, r2, coefs, intercept = run_ols(X_train, y_train, X_test, y_test)
 
-    # 5. printing results
+    # Report metrics and coefficients for transparency.
     print("\n=== Sklearn OLS (LinearRegression) ===")
     print(f"MSE: {mse:.4f}")
     print(f"R^2: {r2:.4f}")

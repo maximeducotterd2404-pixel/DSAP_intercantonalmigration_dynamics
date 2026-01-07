@@ -1,1 +1,1 @@
-"""Project src package init (kept empty)."""
+"""ML package init (empty on purpose)."""

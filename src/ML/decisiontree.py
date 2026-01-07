@@ -7,19 +7,24 @@ from sklearn.tree import DecisionTreeClassifier, plot_tree
 import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score
 
+
 def load_data(path=None):
     if path is None:
-        # get default path when not given
+        # Use a repo-relative path so CLI runs are reproducible.
         ROOT = Path(__file__).resolve().parents[2]
         path = ROOT / "data" / "databasecsv.csv"
 
     try:
-        # read csv with ; separator
+        # Raw data uses ";" as a delimiter, so avoid mis-parsing.
         df = pd.read_csv(path, sep=";")
-        # clean column names
+        # Trim whitespace to keep column name matching stable.
         df.columns = df.columns.str.strip()
-        # fix cluster column names if they have spaces
-        rename_map = {c: c.replace("CLUSTER ", "CLUSTER") for c in df.columns if c.startswith("CLUSTER ")}
+        # Normalize cluster labels to keep feature names consistent.
+        rename_map = {
+            c: c.replace("CLUSTER ", "CLUSTER")
+            for c in df.columns
+            if c.startswith("CLUSTER ")
+        }
         if rename_map:
             df = df.rename(columns=rename_map)
         return df
@@ -31,7 +36,7 @@ def load_data(path=None):
         raise RuntimeError(f"Unexpected error loading dataset: {e}")
 
 
-# explicative variables (features for the classifier)
+# Predictors used to classify the direction of migration change.
 FEATURE_COLS = [
     "log_rent_avg",
     "log_avg_income",
@@ -40,20 +45,21 @@ FEATURE_COLS = [
     "housing_construction_pc",
     "CLUSTER0",
     "CLUSTER1",
-    "CLUSTER2"
+    "CLUSTER2",
 ]
 
-# preparation of the data
+
+# Prepare data to turn migration dynamics into a classification target.
 def prepare_dataset(df):
-    # sort by canton and year to make diffs correct
+    # Sort to compute within-canton changes reliably.
     df = df.sort_values(["canton", "year"])
 
-    # target variable: direction of migration_rate change
+    # Directional target focuses on sign of change, not magnitude.
     df["migration_rate_diff"] = df.groupby("canton")["migration_rate"].diff()
     df = df.dropna(subset=["migration_rate_diff"])
     df["y_cls"] = (df["migration_rate_diff"] > 0).astype(int)
 
-    # verification of required columns
+    # Fail fast if required columns are missing.
     required_cols = ["canton", "year", "migration_rate"] + FEATURE_COLS
     missing = [col for col in required_cols if col not in df.columns]
 
@@ -62,15 +68,14 @@ def prepare_dataset(df):
             f"Missing required columns in dataset: {missing}\n"
             f"Columns available: {list(df.columns)}"
         )
-    
-    # validation of the split
+
+    # Ensure time-splitting logic works as intended.
     if not np.issubdtype(df["year"].dtype, np.number):
         raise TypeError("Column 'year' must be numeric for time-based split.")
-    
-    # temporal train test split
-    train = df["year"] <= 2021
-    test  = df["year"] >= 2022
 
+    # Time split avoids peeking into future years.
+    train = df["year"] <= 2021
+    test = df["year"] >= 2022
 
     if (train.sum() == 0) or (test.sum() == 0):
         raise ValueError(
@@ -85,42 +90,46 @@ def prepare_dataset(df):
 
     return X_train, y_train, X_test, y_test
 
-# decision tree model
+
+# Decision tree offers an interpretable nonlinear classifier.
 def train_decision_tree(X_train, y_train, max_depth=3):
-    # shallow tree to avoid big overfitting
+    # Shallow depth keeps the tree readable and reduces overfitting.
     model = DecisionTreeClassifier(max_depth=3, random_state=0)
-    # training with error handling
+    # Fit with guardrails so failures are explicit.
     try:
         model.fit(X_train, y_train)
     except ValueError as e:
         raise ValueError(f"DecisionTree training failed: {e}")
     except Exception as e:
         raise RuntimeError(f"Unexpected error during tree training: {e}")
-    
+
     return model
 
-# prediction and evaluation
+
+# Evaluate directional accuracy on held-out years.
+
 
 def evaluate_model(model, X_test, y_test):
     """Return accuracy of the decision tree."""
-    # just do predictions and compare
+    # Accuracy is adequate for the binary direction target.
     preds = model.predict(X_test)
     acc = accuracy_score(y_test, preds)
     return acc
 
+
 def main():
-    # load data
+    # Single load for reproducible inputs.
     df = load_data()
     X_train, y_train, X_test, y_test = prepare_dataset(df)
 
-    # train model
+    # Fit an interpretable classifier.
     model = train_decision_tree(X_train, y_train)
 
-    # evaluation
+    # Report out-of-sample accuracy.
     acc = evaluate_model(model, X_test, y_test)
     print(f"Decision Tree Accuracy = {acc:.3f}")
 
-    # graphical plot
+    # Visualize the tree to support interpretation.
     plt.figure(figsize=(16, 10))
     plot_tree(
         model,
@@ -128,7 +137,7 @@ def main():
         class_names=["baisse", "hausse"],
         filled=True,
         rounded=True,
-        fontsize=12
+        fontsize=12,
     )
     plt.title("Decision tree (max_depth = 3) — migration rate prediction")
     plt.show()

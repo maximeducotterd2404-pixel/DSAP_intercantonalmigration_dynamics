@@ -10,22 +10,26 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import r2_score, root_mean_squared_error
 
 
-# 1. Load and clean data
+# 1. Load and clean data to keep the pipeline reproducible and source-consistent
 
 
 def load_data(path=None):
     if path is None:
-        # default dataset path
+        # Keep a repo-relative default so results are reproducible across machines.
         ROOT = Path(__file__).resolve().parents[3]
         path = ROOT / "data" / "databasecsv.csv"
 
     try:
-        # read csv with ; separator
+        # The raw file uses ";" separators, so read without implicit parsing changes.
         df = pd.read_csv(path, sep=";")
-        # clean column names
+        # Strip whitespace to avoid silent mismatches after source harmonization.
         df.columns = df.columns.str.strip()
-        # fix cluster column names
-        rename_map = {c: c.replace("CLUSTER ", "CLUSTER") for c in df.columns if c.startswith("CLUSTER ")}
+        # Normalize cluster labels to keep feature names stable across exports.
+        rename_map = {
+            c: c.replace("CLUSTER ", "CLUSTER")
+            for c in df.columns
+            if c.startswith("CLUSTER ")
+        }
         if rename_map:
             df = df.rename(columns=rename_map)
         return df
@@ -43,23 +47,22 @@ def load_data(path=None):
         raise RuntimeError(f"Unexpected error when loading dataset at {path}: {e}")
 
 
-
-# 2. Feature selection and preparation
+# 2. Feature selection and preparation to match the documented model specification
 
 
 def prepare_dataframe(df: pd.DataFrame):
 
-    # Encode canton as categorical codes
+    # Encode cantons so fixed effects can capture unobserved regional heterogeneity.
     df["canton_id"] = df["canton"].astype("category").cat.codes
 
-    # Lag of migration_rate
+    # Lagged migration captures persistence in mobility flows.
     df["migration_lag1"] = df.groupby("canton_id")["migration_rate"].shift(1)
 
-    # One-hot encoding for canton fixed effects
+    # One-hot canton effects allow structural differences to inform predictions.
     FE = pd.get_dummies(df["canton_id"], prefix="FE", drop_first=True)
     df = pd.concat([df, FE], axis=1)
 
-    # keep a small set of features for the RF
+    # Use the report's core housing, labor, and shock features to limit overfitting.
     feature_cols = [
         "log_rent_avg",
         "log_avg_income",
@@ -73,7 +76,7 @@ def prepare_dataframe(df: pd.DataFrame):
 
     target_col = "migration_rate"
 
-    # Check required columns
+    # Fail fast if upstream preprocessing changed expected columns.
     cols_needed = feature_cols + [target_col]
     missing = [c for c in cols_needed if c not in df.columns]
 
@@ -83,10 +86,10 @@ def prepare_dataframe(df: pd.DataFrame):
             f"Columns available in dataset: {list(df.columns)}"
         )
 
-    # Drop NaN values
+    # Keep a consistent sample across features and target.
     df = df.dropna(subset=cols_needed).copy()
 
-    # Convert to numeric safely
+    # Guard against mixed types in the merged CSV exports.
     try:
         df[feature_cols] = df[feature_cols].apply(pd.to_numeric, errors="coerce").values
         df[target_col] = pd.to_numeric(df[target_col], errors="coerce").values
@@ -94,23 +97,25 @@ def prepare_dataframe(df: pd.DataFrame):
     except Exception as e:
         raise ValueError(f"Failed to convert data to numeric: {e}")
 
-    # Check for NaN after conversion
+    # Avoid silent NaNs that would bias training or evaluation.
     if df[feature_cols].isna().any().any() or df[target_col].isna().any():
-        raise ValueError("NaN values detected in features or target after numeric conversion.")
+        raise ValueError(
+            "NaN values detected in features or target after numeric conversion."
+        )
 
     return df, feature_cols, target_col
 
 
-# 3. Temporal train-test split
+# 3. Temporal train-test split to mirror real forecasting and prevent leakage
 
 
 def time_split(df: pd.DataFrame, feature_cols, target_col):
 
-    # sort by year (time split)
+    # Preserve temporal ordering so test years are strictly out-of-sample.
     df = df.sort_values("year").reset_index(drop=True)
 
     years = df["year"].unique()
-    cut = int(0.8 * len(years))   # 80% train / 20% test
+    cut = int(0.8 * len(years))  # Keep the split close to the report's 80/20 setup.
 
     train_years = set(years[:cut])
     test_years = set(years[cut:])
@@ -124,33 +129,32 @@ def time_split(df: pd.DataFrame, feature_cols, target_col):
     return X_train, X_test, y_train, y_test
 
 
-
-# 4. Random Forest model
+# 4. Random Forest model to capture nonlinearities and interactions
 
 
 def run_random_forest(X_train, y_train, X_test, y_test):
 
-    # build the RF model
+    # Light tuning keeps the model flexible without overfitting a small panel.
     rf = RandomForestRegressor(
-    n_estimators=300,
+        n_estimators=300,
         max_depth=6,
         min_samples_leaf=5,
         max_features=0.5,
         random_state=0,
-        n_jobs=-1
+        n_jobs=-1,
     )
 
-    # Training
+    # Fit once so results remain comparable across models.
     try:
         rf.fit(X_train, y_train)
     except Exception as e:
         raise RuntimeError(f"Random Forest training failed: {e}")
 
-    # Train predictions
+    # Track in-sample fit to diagnose potential overfitting.
     y_train_pred = rf.predict(X_train)
     r2_train = r2_score(y_train, y_train_pred)
 
-    # Test predictions
+    # Evaluate generalization on later years, consistent with the time split.
     y_pred = rf.predict(X_test)
     rmse = root_mean_squared_error(y_test, y_pred)
     r2 = r2_score(y_test, y_pred)
@@ -158,39 +162,31 @@ def run_random_forest(X_train, y_train, X_test, y_test):
     return rf, y_pred, r2, rmse, r2_train
 
 
-
-# 5. Feature importance extraction
+# 5. Feature importance extraction for interpretation
 
 
 def get_feature_importance(rf, feature_cols):
-    # take built-in importances from sklearn
+    # Impurity-based importances provide a readable ranking of predictors.
     importances = rf.feature_importances_
 
-    # sort highest first
-    feat_imp = sorted(
-        zip(feature_cols, importances),
-        key=lambda x: x[1],
-        reverse=True
-    )
+    # Sort for quick inspection in the CLI output.
+    feat_imp = sorted(zip(feature_cols, importances), key=lambda x: x[1], reverse=True)
 
     return feat_imp
 
 
-
-# main
+# CLI entry point to reproduce the report's Random Forest results
 
 if __name__ == "__main__":
-    # quick run from CLI
+    # Keep a one-command run for reproducible reporting.
     df = load_data()
     df, feature_cols, target = prepare_dataframe(df)
 
     X_train, X_test, y_train, y_test = time_split(df, feature_cols, target)
 
-    rf, y_pred, r2, rmse, r2_train = run_random_forest(
-        X_train, y_train, X_test, y_test
-    )
+    rf, y_pred, r2, rmse, r2_train = run_random_forest(X_train, y_train, X_test, y_test)
 
-    # print results
+    # Print a compact summary for quick checks and report tables.
     print("\n=== RANDOM FOREST RESULTS ===")
     print(f"Train R² : {r2_train:.4f}")
     print(f"Test  R² : {r2:.4f}")

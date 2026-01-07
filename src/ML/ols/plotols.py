@@ -1,4 +1,4 @@
-# rf_plots.py
+# Plot helper to persist OLS diagnostics for the report.
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -7,15 +7,15 @@ from pathlib import Path
 
 def plot_true_vs_pred_rf(y_true, y_pred, title="Random Forest – True vs Predicted"):
     """
-    Scatter plot comparing true vs predicted migration_rate.
-    Includes diagonal perfect prediction line.
+    Scatter plot to diagnose calibration and bias.
+    The diagonal serves as the ideal prediction reference.
     """
 
-    # basic scatter
+    # Scatter helps spot systematic under/over-prediction.
     plt.figure(figsize=(7, 7))
     plt.scatter(y_true, y_pred, alpha=0.7, label="Observations")
 
-    # Perfect prediction reference line
+    # Diagonal reference highlights perfect predictions.
     min_val = min(np.min(y_true), np.min(y_pred))
     max_val = max(np.max(y_true), np.max(y_pred))
 
@@ -24,7 +24,7 @@ def plot_true_vs_pred_rf(y_true, y_pred, title="Random Forest – True vs Predic
         [min_val, max_val],
         linestyle="--",
         linewidth=2,
-        label="Perfect prediction"
+        label="Perfect prediction",
     )
 
     plt.xlabel("True migration_rate")
@@ -34,7 +34,7 @@ def plot_true_vs_pred_rf(y_true, y_pred, title="Random Forest – True vs Predic
     plt.grid(True)
     plt.legend()
     plt.tight_layout()
-    # save plot to results folder
+    # Persist the plot for reporting and comparisons.
     results_dir = Path(__file__).resolve().parents[3] / "results"
     outfile = results_dir / "ols_true_vs_pred.png"
     plt.savefig(outfile, dpi=300, bbox_inches="tight")
