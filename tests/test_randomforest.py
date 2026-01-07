@@ -16,7 +16,8 @@ from src.ML.randomforest.randomforest import (
 
 # 1. load_data
 def test_load_data_success(tmp_path):
-    """load_data should load a CSV successfully."""
+    """load_data should load a CSV successfully. Why: confirms the I/O helper
+    handles our delimiter and returns a DataFrame with the expected shape."""
     fake_file = tmp_path / "fake.csv"
     df_test = pd.DataFrame({"a": [1, 2], "b": [3, 4]})
     df_test.to_csv(fake_file, sep=";", index=False)
@@ -28,7 +29,8 @@ def test_load_data_success(tmp_path):
 
 
 def test_load_data_missing():
-    """load_data should raise FileNotFoundError when file doesn't exist."""
+    """load_data should raise FileNotFoundError when file doesn't exist. Why:
+    ensures missing data is surfaced clearly instead of failing silently."""
     with pytest.raises(FileNotFoundError):
         load_data(path="this_file_does_not_exist.csv")
 
@@ -37,7 +39,8 @@ def test_load_data_missing():
 
 
 def test_prepare_dataframe_valid():
-    """prepare_dataframe should return cleaned df + feature list + target name."""
+    """prepare_dataframe should return cleaned df + feature list + target name.
+    Why: verifies feature engineering (lag, clusters) and target selection."""
     df = pd.DataFrame(
         {
             "canton": ["VD", "VD", "VD"],
@@ -72,7 +75,8 @@ def test_prepare_dataframe_valid():
 
 
 def test_prepare_dataframe_missing_cols():
-    """prepare_dataframe should raise KeyError when required columns are missing."""
+    """prepare_dataframe should raise KeyError when required columns are missing.
+    Why: we want a fast, explicit failure for malformed inputs."""
     df = pd.DataFrame({"wrongcol": [1, 2]})
 
     with pytest.raises(KeyError):
@@ -83,7 +87,8 @@ def test_prepare_dataframe_missing_cols():
 
 
 def test_time_split_basic():
-    """time_split should return four numpy arrays with correct shapes."""
+    """time_split should return four numpy arrays with correct shapes. Why:
+    downstream training expects numpy arrays and consistent feature counts."""
     df = pd.DataFrame(
         {
             "canton": ["VD", "VD", "VD", "VD"],
@@ -112,7 +117,8 @@ def test_time_split_basic():
 
 
 def test_run_random_forest():
-    """run_random_forest should fit a model and return predictions + scores."""
+    """run_random_forest should fit a model and return predictions + scores.
+    Why: the training helper is the single entry point for model evaluation."""
     X_train = np.random.rand(20, 3)
     y_train = np.random.rand(20)
     X_test = np.random.rand(5, 3)
@@ -131,7 +137,8 @@ def test_run_random_forest():
 
 
 def test_feature_importance():
-    """get_feature_importance should return non-empty sorted list."""
+    """get_feature_importance should return non-empty sorted list. Why:
+    interpretability output must map feature names to numeric importances."""
     X = np.random.rand(10, 3)
     y = np.random.rand(10)
 

@@ -54,7 +54,6 @@ Detailed results with coefficients: run the model-specific prediction scripts fr
 ├── main.py
 ├── data/
 │   ├── databasecsv.csv
-│   ├── README.md
 │   └── raw/
 ├── results/
 ├── notebooks/

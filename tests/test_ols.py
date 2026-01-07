@@ -10,7 +10,8 @@ from src.ML.ols.ols import load_data, prepare_dataframe, time_split, run_ols
 
 
 def test_load_data_success(tmp_path):
-    """load_data should load a valid CSV file."""
+    """load_data should load a valid CSV file. Why: verifies the loader uses
+    the expected separator and preserves shape."""
     fake_file = tmp_path / "fake.csv"
     df_test = pd.DataFrame(
         {"migration_rate": [1, 2], "year": [2014, 2015], "canton": ["VD", "GE"]}
@@ -24,7 +25,8 @@ def test_load_data_success(tmp_path):
 
 
 def test_load_data_missing_file():
-    """load_data should raise FileNotFoundError when file is missing."""
+    """load_data should raise FileNotFoundError when file is missing. Why:
+    missing data should fail fast with a clear error."""
     with pytest.raises(FileNotFoundError):
         load_data(path="DOES_NOT_EXIST.csv")
 
@@ -33,7 +35,8 @@ def test_load_data_missing_file():
 
 
 def test_prepare_dataframe_valid():
-    """prepare_dataframe should return cleaned df + X + y + feature list."""
+    """prepare_dataframe should return cleaned df + X + y + feature list. Why:
+    ensures feature engineering and target extraction are consistent."""
 
     df = pd.DataFrame(
         {
@@ -65,7 +68,8 @@ def test_prepare_dataframe_valid():
 
 
 def test_prepare_dataframe_missing_columns():
-    """prepare_dataframe should raise KeyError when columns are missing."""
+    """prepare_dataframe should raise KeyError when columns are missing. Why:
+    prevents training on incomplete or misnamed inputs."""
     df = pd.DataFrame({"wrong": [1, 2, 3]})
 
     with pytest.raises(KeyError):
@@ -76,7 +80,8 @@ def test_prepare_dataframe_missing_columns():
 
 
 def test_time_split_basic():
-    """time_split should output correct shapes."""
+    """time_split should output correct shapes. Why: the time split is core to
+    avoiding leakage and keeping train/test dimensions valid."""
 
     df = pd.DataFrame(
         {
@@ -103,7 +108,8 @@ def test_time_split_basic():
 
 # 4. Test run_ols()
 def test_run_ols_basic():
-    """run_ols should fit and return predictions, mse, r2, coefs, intercept."""
+    """run_ols should fit and return predictions, mse, r2, coefs, intercept.
+    Why: a single helper should provide all metrics used for reporting."""
 
     X_train = np.array([[1], [2], [3]])
     y_train = np.array([1, 2, 3])

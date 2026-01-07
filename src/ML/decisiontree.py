@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-
+""""
+This code hasn't been presented in the report, as it was a test of decision tree modeling
+in order to me to understand what it represents and how it works"
+"""
 from pathlib import Path
 import pandas as pd
 import numpy as np

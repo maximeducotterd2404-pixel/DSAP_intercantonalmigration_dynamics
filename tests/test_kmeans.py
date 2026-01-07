@@ -17,7 +17,8 @@ from src.ML.kmeans.kmeans import (
 
 
 def test_load_data_success(tmp_path):
-    """load_data should load a valid CSV file."""
+    """load_data should load a valid CSV file. Why: confirms the loader
+    handles the expected delimiter and returns a DataFrame."""
     # Create fake csv
     file = tmp_path / "fake.csv"
     df_test = pd.DataFrame({"A": [1, 2]})
@@ -29,14 +30,16 @@ def test_load_data_success(tmp_path):
 
 
 def test_load_data_missing_file():
-    """load_data should raise an error if the file does not exist."""
+    """load_data should raise an error if the file does not exist. Why:
+    data access failures should be explicit and actionable."""
     with pytest.raises(FileNotFoundError):
         load_data(path="THIS_FILE_DOES_NOT_EXIST.csv")
 
 
 # test matrix preparation
 def test_prepare_matrix_valid():
-    """prepare_matrix should return df_clean and X as a numpy matrix."""
+    """prepare_matrix should return df_clean and X as a numpy matrix. Why:
+    clustering relies on a consistent numeric feature matrix."""
     df = pd.DataFrame(
         {
             "Z_score_rent": [0.1, 0.2],
@@ -56,7 +59,8 @@ def test_prepare_matrix_valid():
 
 
 def test_prepare_matrix_missing_columns():
-    """prepare_matrix should raise an error when columns are missing."""
+    """prepare_matrix should raise an error when columns are missing. Why:
+    prevents silent dropping of required features."""
     df = pd.DataFrame({"wrong_col": [1, 2, 3]})
 
     with pytest.raises(KeyError):
@@ -67,7 +71,8 @@ def test_prepare_matrix_missing_columns():
 
 
 def test_run_kmeans_basic():
-    """run_kmeans should fit a model with k clusters."""
+    """run_kmeans should fit a model with k clusters. Why: confirms the
+    wrapper returns a fitted model and respects k."""
     # simple dataset
     X = np.array([[0], [1], [2], [10], [11], [12]])
 
@@ -82,7 +87,8 @@ def test_run_kmeans_basic():
 
 
 def test_assign_clusters():
-    """assign_clusters should add a cluster column."""
+    """assign_clusters should add a cluster column. Why: downstream analysis
+    expects a labeled DataFrame for grouping and plots."""
     df = pd.DataFrame({"a": [1, 2, 3]})
     X = np.array([[0], [1], [2]])
 

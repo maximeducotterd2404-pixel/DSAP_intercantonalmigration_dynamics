@@ -36,7 +36,7 @@ def load_data(path=None):
         raise RuntimeError(f"Unexpected error loading dataset: {e}")
 
 
-# Prepare the matrix so clustering reflects structural profiles.
+# Prepare the matrix used for clustering.
 
 
 def prepare_matrix(df, feature_cols=FEATURE_COLS):
@@ -70,7 +70,7 @@ def prepare_matrix(df, feature_cols=FEATURE_COLS):
 
 
 # Run K-means to summarize cantonal profiles.
-def run_kmeans(X, k=4, random_state=0):
+def run_kmeans(X, k=3, random_state=0):
     # Fixed seed and n_init improve stability for small samples.
     model = KMeans(n_clusters=k, random_state=random_state, n_init=10)
     model.fit(X)
@@ -88,7 +88,7 @@ def main():
     # End-to-end run for reproducible cluster assignment.
     df = load_data()
     df_clean, X = prepare_matrix(df)
-    model = run_kmeans(X, k=4)
+    model = run_kmeans(X, k=3)
     df_clustered = assign_clusters(df_clean, model)
 
     print("\n=== TOTAL INERTIA ===")

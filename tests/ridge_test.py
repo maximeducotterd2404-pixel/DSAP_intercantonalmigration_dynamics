@@ -15,7 +15,8 @@ from src.ML.ridge.ridge import (
 
 
 def test_load_data_success(tmp_path):
-    """load_data doit charger un CSV valide."""
+    """load_data should load a valid CSV. Why: verifies the I/O wrapper returns
+    a DataFrame and handles the expected separator."""
     file = tmp_path / "fake.csv"
     df_test = pd.DataFrame({"A": [1, 2]})
     df_test.to_csv(file, sep=";", index=False)
@@ -26,7 +27,8 @@ def test_load_data_success(tmp_path):
 
 
 def test_load_data_missing_file():
-    """load_data doit lever FileNotFoundError si fichier inexistant."""
+    """load_data should raise FileNotFoundError for a missing file. Why:
+    surfaces data access issues early in the pipeline."""
     with pytest.raises(FileNotFoundError):
         load_data("FILE_DOES_NOT_EXIST.csv")
 
@@ -35,7 +37,8 @@ def test_load_data_missing_file():
 
 
 def test_prepare_dataframe_valid():
-    """prepare_dataframe doit retourner un df propre avec toutes les features."""
+    """prepare_dataframe should return a cleaned df with all features. Why:
+    confirms lag creation and categorical expansion are applied."""
 
     df = pd.DataFrame(
         {
@@ -54,7 +57,7 @@ def test_prepare_dataframe_valid():
 
     df_prepared = prepare_dataframe(df)
 
-    # verifications
+    # Checks that preprocessing keeps expected structure after feature engineering.
     assert isinstance(df_prepared, pd.DataFrame)
     assert "canton_GE" in df_prepared.columns or "canton_VD" in df_prepared.columns
     # With migration_lag1, one first-year observation is dropped per canton -> 2 rows kept
@@ -62,7 +65,8 @@ def test_prepare_dataframe_valid():
 
 
 def test_prepare_dataframe_missing_cols():
-    """prepare_dataframe doit lever KeyError si colonnes manquantes."""
+    """prepare_dataframe should raise KeyError when columns are missing. Why:
+    we fail fast on malformed input instead of producing wrong outputs."""
     df = pd.DataFrame({"irrelevant": [1, 2]})
     with pytest.raises(KeyError):
         prepare_dataframe(df)
@@ -72,7 +76,8 @@ def test_prepare_dataframe_missing_cols():
 
 
 def test_time_split_basic():
-    """time_split doit renvoyer 4 matrices numpy bien séparées."""
+    """time_split should return four numpy arrays. Why: downstream training
+    expects numpy inputs with a deterministic split."""
 
     df = pd.DataFrame(
         {
@@ -85,7 +90,7 @@ def test_time_split_basic():
 
     X_train, X_test, y_train, y_test = time_split(df, feature_cols=["f1", "f2"])
 
-    # Vérifications
+    # Checks that the split returns non-empty train/test arrays.
     assert isinstance(X_train, np.ndarray)
     assert isinstance(X_test, np.ndarray)
     assert len(X_train) > 0
@@ -96,7 +101,8 @@ def test_time_split_basic():
 
 
 def test_run_ridge_basic():
-    "run ridge have to return model, best_alpha, best_r2, results, scaler"
+    """run_ridge should return model, best_alpha, best_r2, results, scaler.
+    Why: the helper centralizes tuning and scaling outputs used elsewhere."""
 
     X_train = np.array([[0], [1], [2]])
     y_train = np.array([0, 1, 2])

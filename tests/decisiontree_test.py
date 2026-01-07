@@ -4,7 +4,9 @@ from src.ML.decisiontree import prepare_dataset, train_decision_tree, evaluate_m
 
 
 def test_decision_tree_pipeline():
-    # synthetic dataset
+    """End-to-end check of the decision tree pipeline. Why: ensures the
+    preprocessing, training, and evaluation functions work together."""
+    # Use a small synthetic dataset to keep the test deterministic and fast.
     df = pd.DataFrame(
         {
             "canton": ["A", "A", "A", "B", "B", "B"],

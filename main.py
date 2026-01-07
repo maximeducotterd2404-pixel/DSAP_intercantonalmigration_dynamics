@@ -51,7 +51,6 @@ def configure_matplotlib(non_interactive: bool) -> None:
 
 def run_ols(data_path: Path) -> None:
     # Use the data_loader facade (wraps existing loader/prep)
-    # Use the data_loader facade (wraps existing loader/prep)
     df_model, X_df, y_ser, feature_cols = dl.load_for_ols(data_path)
     X_train, X_test, y_train, y_test = ols_module.time_split(df_model, feature_cols)
     model, y_pred, mse, r2, _, _ = mdl.train_ols(X_train, y_train, X_test, y_test)

@@ -58,7 +58,7 @@ def plot_cluster_radar(df, title="Cluster profiles (K-means, canton averages)"):
 
     profiles = _build_profiles(df)
 
-    # Use human-readable labels for the radar axes.
+    # Use readable labels for the radar axes.
     categories = [label for _, label in FEATURE_MAP]
     n_vars = len(categories)
 
