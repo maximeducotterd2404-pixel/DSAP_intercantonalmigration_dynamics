@@ -7,19 +7,18 @@
 
 ## How AI Assisted
 
-### 1. Project Structure & Boilerplate
+### 1. Project Structure
 - Generated initial project structure (`main.py`, `src/` modules)
 - Suggested modular architecture following course rulebook requirements
 - Provided template code for data loading, model training, and evaluation pipelines
 
 ### 2. Debugging & Error Resolution
 - Helped diagnose pandas merge errors and data type mismatches
-- Suggested fixes for scikit-learn API usage (e.g., `random_state`, `TimeSeriesSplit`)
+- Suggested fixes for scikit-learn usage (e.g., `random_state`, `TimeSeriesSplit`)
 - Identified issues with feature scaling in Ridge regression
 
 ### 3. Learning New Libraries
 - Explained `scikit-learn` best practices for time-based splits
-- Guided implementation of `GridSearchCV` with temporal cross-validation
 - Clarified `matplotlib` plotting for true vs predicted scatter plots
 
 ### 4. Code Review & Refactoring
@@ -83,7 +82,7 @@
 - Interpret my results
 - Make modeling decisions
 
-All final code was written, reviewed, tested, and validated by me. I take full responsibility for the project's design, implementation, and results.
+All final code was adapted, reviewed, tested, and validated by me.
 
 ---
 

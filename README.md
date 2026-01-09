@@ -45,24 +45,26 @@ Detailed results with coefficients: run the model-specific prediction scripts fr
 
 ## Project structure
 ```
-.
-├── README.md
-├── PROPOSAL.md
-├── AI_USAGE.md
-├── environment.yml
-├── requirements.txt
 ├── main.py
 ├── data/
 │   ├── databasecsv.csv
+│   ├── README.md
+│   ├── databasecsv.xlsx
 │   └── raw/
+├── docs/
+├── examples/
+├── notebooks/
 ├── results/
 ├── notebooks/
 └── src/
-    ├── __init__.py
-    ├── data_loader.py
-    ├── models.py
-    ├── evaluation.py
-    └── ML/
+├── src/
+│    ├── __init__.py
+│    ├── data_loader.py
+│    ├── models.py
+│    ├── evaluation.py
+│    ├── what-if.py
+│    └── ML/
+└── tests/
 ```
 
 ## Reproducibility
