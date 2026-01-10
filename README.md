@@ -48,7 +48,6 @@ Detailed results with coefficients: run the model-specific prediction scripts fr
 ├── main.py
 ├── data/
 │   ├── databasecsv.csv
-│   ├── README.md
 │   ├── databasecsv.xlsx
 │   └── raw/
 ├── docs/
@@ -56,7 +55,6 @@ Detailed results with coefficients: run the model-specific prediction scripts fr
 ├── notebooks/
 ├── results/
 ├── notebooks/
-└── src/
 ├── src/
 │    ├── __init__.py
 │    ├── data_loader.py
@@ -64,6 +62,11 @@ Detailed results with coefficients: run the model-specific prediction scripts fr
 │    ├── evaluation.py
 │    ├── what-if.py
 │    └── ML/
+│         ├── Gradientboosting/
+│         ├── Kmeans/
+│         ├── ols/
+│         ├── randomforest/
+│         ├── ridge/
 └── tests/
 ```
 
